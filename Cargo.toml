@@ -1,6 +1,6 @@
 [package]
-name = "primase-vertex"
-description = "Checked vertex layouts, quantization and index topology"
+name = "primase-havok"
+description = "Checked Havok tagfile and compendium views"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,7 +10,7 @@ publish.workspace = true
 
 [dependencies]
 thiserror.workspace = true
-half.workspace = true
+primase-vertex.workspace = true
 
 [lints]
 workspace = true
