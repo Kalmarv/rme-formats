@@ -34,7 +34,7 @@ workspace = true
 
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.99"
 license = "GPL-3.0-or-later"
@@ -48,7 +48,7 @@ morpheme-formats = { version = "0.1.0", git = "https://github.com/Kalmarv/morphe
 primase-foundations = { version = "0.2.0", git = "https://github.com/Kalmarv/primase-foundations", rev = "b3a3d4b3a892b8342fda081ab4449bb57052a2f8" }
 primase-testdata = { version = "0.1.0", git = "https://github.com/Kalmarv/primase-testdata", rev = "d0258530ca9ca0ca74e957716ae8683e7facc8a7" }
 quantydb-sqlite = { version = "=0.4.0", default-features = false }
-rsx-reader = { version = "0.1.1", git = "https://github.com/Kalmarv/dx", rev = "1e48484d31204ed1d120266bc0ebccdb88f4faa5" }
+rsx-reader = { version = "0.2.0", git = "https://github.com/Kalmarv/dx", rev = "91c6b5e1ddcb71472414c92759911949428bba93" }
 serde = { version = "1", default-features = false, features = ["std", "derive"] }
 serde_json = { version = "=1.0.154", default-features = false, features = ["std", "preserve_order", "float_roundtrip"] }
 sha2 = { version = "=0.11.1", default-features = false }
