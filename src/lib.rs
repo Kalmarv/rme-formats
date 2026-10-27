@@ -1,7 +1,10 @@
-//! Readers for the data of Tony Hawk's SHRED (PS3), the RME engine's disc format.
+//! Readers for the game data of Tony Hawk's SHRED (PS3, 2010), which runs on Robomodo's RME engine.
 //!
-//! Bytes in, plain records out. Nothing here loads a game, builds a scene or chooses what a record means beyond what the
-//! files state; fields whose role is unproven are kept as stored.
+//! Bytes in, plain records out: archives, level meshes, materials, textures, the game's SQLite database, a level's
+//! Lua parameter script and animation reference rigs. Nothing here loads a game, renders a scene or decides what a
+//! record means beyond what the files state; a field whose role is not known is kept as stored. Every length, count
+//! and offset is checked against the bytes it indexes, and a malformed file is refused with an [`Error`] that names the
+//! offset, never a panic.
 //!
 //! - Containers: [`pak`] reads PAK v4 archives (big endian, named entries in sections, stored or [`cstr`] blocks), and
 //!   [`cstr`] the CSTR framing of one compressed entry.
@@ -18,6 +21,38 @@
 //! - Animation: [`reference_rig`] reads the Morpheme reference rigs of an animation container.
 //!
 //! Matrices are [`Affine`] values in the source frame (left-handed, Y up); converting them is the caller's.
+//!
+//! # Example
+//!
+//! Open an archive from your own disc and decode every level mesh in it (this compiles but is not run, as it needs
+//! the game's files; `examples/list_quartets.rs` is the same code as a program):
+//!
+//! ```no_run
+//! use rme_formats::{pak::Pak, scene};
+//!
+//! let pak = Pak::open("PS3_GAME/USRDIR/LEVELS/CHARLIE.PAK")?;
+//! for (stem, entries) in scene::quartets(&pak)? {
+//!     let scene = scene::decode_quartet(&pak, entries)?;
+//!     println!(
+//!         "{}: {} models, {} placements",
+//!         String::from_utf8_lossy(&stem),
+//!         scene.models.len(),
+//!         scene.placements.len()
+//!     );
+//! }
+//! # Ok::<(), rme_formats::Error>(())
+//! ```
+//!
+//! Bytes that are not a readable file are refused, with the offset and what was expected:
+//!
+//! ```
+//! use rme_formats::pak::Pak;
+//!
+//! // the magic, the endian tag, then version 5
+//! let header = [b'P', b'A', b'K', 0, 0xfe, 0xeb, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0];
+//! let error = Pak::from_bytes(header.to_vec()).unwrap_err();
+//! assert_eq!(error.to_string(), "at 0x6: unsupported PAK version");
+//! ```
 #![deny(clippy::disallowed_methods, clippy::disallowed_types)]
 
 pub mod attributes;
@@ -46,8 +81,10 @@ pub mod texture;
 /// Why a read was refused.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    /// Reading the file failed.
     #[error("I/O: {0}")]
     Io(#[from] std::io::Error),
+    /// A named field lies outside the bytes being read; the message gives its offset.
     #[error(transparent)]
     Field(#[from] primase_foundations::bytes::FieldError),
     /// The data is not what the format allows, at `offset` in the file or decoded entry being read.
@@ -55,6 +92,7 @@ pub enum Error {
     Invalid { offset: usize, detail: String },
 }
 
+/// A read that is either done or refused with an [`Error`].
 pub type Result<T> = std::result::Result<T, Error>;
 
 pub(crate) fn invalid(offset: usize, detail: impl ToString) -> Error {
@@ -72,6 +110,7 @@ pub struct Affine {
 }
 
 impl Affine {
+    /// The transform that changes nothing.
     pub const IDENTITY: Affine = Affine {
         cols: [[1., 0., 0.], [0., 1., 0.], [0., 0., 1.], [0., 0., 0.]],
     };

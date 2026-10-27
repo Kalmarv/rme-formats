@@ -1,4 +1,6 @@
-//! CSTR v1: exact block framing, stored blocks or RFC 1951 raw DEFLATE.
+//! CSTR v1, the framing of one compressed [`crate::pak`] entry: a header (magic, endian tag, version, block count,
+//! total size) and blocks with 16-bit sizes, each stored as is or as RFC 1951 raw DEFLATE. The header, every block
+//! size and the total are checked, and nothing may follow the last block.
 use crate::{Result, invalid};
 use primase_foundations::bytes::{Endian::Big, Field, View};
 use primase_foundations::compress::{Decompressor, Deflate};
@@ -6,8 +8,11 @@ use primase_foundations::compress::{Decompressor, Deflate};
 /// Decoded bytes and block counts (including stored blocks).
 #[derive(Debug)]
 pub struct Decoded {
+    /// The decoded stream.
     pub bytes: Vec<u8>,
+    /// Number of blocks in the stream.
     pub blocks: usize,
+    /// How many of those blocks are stored rather than DEFLATE-compressed.
     pub stored_blocks: usize,
 }
 

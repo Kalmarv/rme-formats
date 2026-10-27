@@ -1,5 +1,12 @@
-//! Pure quartet decoder. All offsets in diagnostics are relative to the named decoded file.
-//! Contracts: SHRED's stored bounds and tables, as its native loader reads them.
+//! Level meshes. A mesh quartet is an `.scp` (scene: placements, nodes, blob sections), an `.mlp` (the model table and
+//! per-model metadata), an `.mmp` (CPU-side vertex and index data) and an `.mgp` (GPU-side vertex attributes) that share
+//! a stem in a [`crate::pak::Pak`]. [`quartets`] finds them, [`decode`] reads one from decoded bytes and
+//! [`decode_quartet`] from an archive.
+//!
+//! Positions and indices are checked against the stored bounds and counts, the submeshes must partition the index
+//! list, and the parts of the files that are not decoded are listed in [`Scene::unread`]. Offsets in diagnostics are
+//! relative to the named decoded file. A model whose vertex variant is not supported is returned with
+//! [`Model::refusal`] set and no geometry, while the other models decode.
 use crate::attributes::{self, Attributes};
 use crate::pak::Pak;
 use crate::skin::{SourceBone, SourceSkinVertex};
@@ -18,29 +25,36 @@ pub struct Unread {
     pub reason: &'static str,
 }
 
+/// A run of a model's indices drawn with one material.
 #[derive(Clone, Debug)]
 pub struct Submesh {
     pub indices: Range<usize>,
+    /// The material id (resolve it with [`crate::library::MaterialLibrary::resolve`]).
     pub material: u32,
     /// Logical ATTR8..11 -> stored UV0..3; 255 retains the same-index source.
     pub uv_remap: [u8; 4],
 }
 
+/// One mesh of a quartet, in source coordinates.
 #[derive(Clone, Debug)]
 pub struct Model {
     pub id: u32,
+    /// The stored axis-aligned bounds, `[min, max]`.
     pub bounds: [[f32; 3]; 2],
     pub positions: Vec<[f32; 3]>,
     pub format: u32,
     pub attributes: Attributes,
     pub processed: Option<Vec<SourceSkinVertex>>,
     pub processed_batches: usize,
+    /// Triangle-list indices into `positions`.
     pub indices: Vec<u32>,
+    /// Spans of `indices` that exactly partition them, each with its material.
     pub submeshes: Vec<Submesh>,
     /// MLP offset and reason; no geometry is fabricated for an unsupported model.
     pub refusal: Option<(usize, &'static str)>,
 }
 
+/// An instance of a model in the level: its transform and name hash.
 #[derive(Clone, Debug)]
 pub struct Placement {
     pub id: u32,
@@ -51,9 +65,12 @@ pub struct Placement {
     pub name: u32,
 }
 
+/// A decoded quartet.
 #[derive(Clone, Debug)]
 pub struct Scene {
+    /// The meshes, in the order of the `.mlp` resource table.
     pub models: Vec<Model>,
+    /// The instances, in the order of the `.scp` placement table.
     pub placements: Vec<Placement>,
     /// The SCP's node table, world matrices and blob sections (spot chunks).
     pub tables: scp_tables::Tables,

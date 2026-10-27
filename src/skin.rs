@@ -1,4 +1,6 @@
-//! Processed 64-byte skin records, from the native preprocessing writer (0x430e38 / 0x430b28).
+//! Processed skin meshes: batches of 64-byte vertex records with bone palettes and 8-bit weights, as the game's
+//! preprocessing step writes them (the functions at 0x430e38 and 0x430b28 in the executable). The decoding is internal
+//! to [`crate::scene`]; its results appear as [`crate::scene::Model::processed`] and [`SourceBone`].
 use crate::attributes::{Attributes, VertexInput};
 use crate::scene::Bytes;
 use crate::{Affine, Result};

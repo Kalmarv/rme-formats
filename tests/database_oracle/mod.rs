@@ -1,4 +1,4 @@
-//! Compares the reader's tables with an oracle dump (`oracles/dump.py`: Python's sqlite3, values as typed hex).
+//! Compares the reader's tables with an oracle dump (`tests/oracles/sqlite_dump.py`: Python's sqlite3, values as typed hex).
 use rme_formats::database::{Database, Table, Value};
 
 fn hex(s: &str) -> Vec<u8> {

@@ -1,4 +1,6 @@
-//! Native table 0x1445920, packed variant selected by mask bit 0x80000; no tangent sign is inferred.
+//! The packed vertex attributes of a rigid mesh: RSX CMP normals, half-float and byte inputs, selected by the model's
+//! vertex format mask. The layout follows the table at 0x1445920 in the game's executable (the variant selected by mask
+//! bit 0x80000). No tangent sign is inferred.
 use crate::Result;
 use crate::scene::Bytes;
 use std::collections::BTreeMap;
@@ -10,13 +12,18 @@ pub struct VertexInput {
     pub values: Vec<[f32; 4]>,
 }
 
+/// The per-vertex data of a model besides its positions, decoded according to the model's vertex format mask.
 #[derive(Clone, Debug, Default)]
 pub struct Attributes {
     /// Source normals: exact RSX CMP for rigid meshes, authored float3 for processed skins. No repair.
     pub normals: Vec<[f32; 3]>,
+    /// Vertex colours (RGBA, 0 to 1), when the format has them.
     pub colors: Option<Vec<[f32; 4]>>,
+    /// The four stored texture-coordinate sets, where present.
     pub uvs: [Option<Vec<[f32; 2]>>; 4],
+    /// Every decoded input by name (`stored_uv0`, `attr12`, ...), including those whose role is not known.
     pub raw: BTreeMap<String, VertexInput>,
+    /// How many normals are the zero vector (accepted as stored, not repaired).
     pub zero_normals: usize,
 }
 

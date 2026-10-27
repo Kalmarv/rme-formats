@@ -13,6 +13,7 @@ pub struct MaterialKey {
     pub id: u32,
 }
 
+/// A constant of a material: four floats under a name hash.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct MaterialParameter {
     pub hash: u32,
@@ -24,6 +25,7 @@ pub struct MaterialParameter {
     pub value: [f32; 4],
 }
 
+/// A texture binding of a material: its stored state and the texture path it names.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct MaterialSampler {
     /// Descriptor ordinal; no claim that this is a hardware texture unit.
@@ -38,8 +40,10 @@ pub struct MaterialSampler {
     pub unknown_state: [u32; 5],
 }
 
+/// How a sampler's name was found.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub enum SamplerNameSource {
+    /// The sampler's hash equals the sdbm of a string in the game's executable.
     ExecutableStringSdbm,
 }
 

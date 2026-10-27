@@ -1,6 +1,10 @@
 # rme-formats
 
-Readers for the data of Tony Hawk's SHRED (PS3, 2010), which runs on Robomodo's RME engine: bytes in, plain records out.
+A Rust library that reads the game data of Tony Hawk's SHRED for PS3: archives, level meshes, materials, textures, the game's database and its level scripts.
+
+Tony Hawk's SHRED (2010) runs on Robomodo's RME engine. The library is written against the PS3 disc (32-bit
+big-endian pointers, the `PS3_GAME/USRDIR` folder) and turns its files into plain Rust records: bytes in, structs out,
+nothing rendered, nothing written back.
 
 | module | reads |
 |---|---|
@@ -13,43 +17,83 @@ Readers for the data of Tony Hawk's SHRED (PS3, 2010), which runs on Robomodo's 
 | `level_params` | the constant-argument calls of a level's Lua 5.1 parameter script |
 | `reference_rig` | the Morpheme reference rigs of an animation container |
 
+## Example
+
+Open an archive from your own disc and decode every level mesh in it. The same code is compiled by the crate's doc test
+and runs as `cargo run --example list_quartets -- <archive.pak>`.
+
 ```rust
 use rme_formats::{pak::Pak, scene};
 
-let pak = Pak::open("LEVELS/CHARLIE.PAK")?;
+let pak = Pak::open("PS3_GAME/USRDIR/LEVELS/CHARLIE.PAK")?;
 for (stem, entries) in scene::quartets(&pak)? {
     let scene = scene::decode_quartet(&pak, entries)?;
-    println!("{}: {} models, {} placements", String::from_utf8_lossy(&stem), scene.models.len(), scene.placements.len());
+    println!(
+        "{}: {} models, {} placements",
+        String::from_utf8_lossy(&stem),
+        scene.models.len(),
+        scene.placements.len()
+    );
 }
 # Ok::<(), rme_formats::Error>(())
 ```
 
 ## What it guarantees
 
-- Lengths, counts and offsets are checked against the bytes they index; a malformed file is refused with an error that
-  names the offset (and, for a quartet, the file within it).
+- Lengths, counts and offsets are checked against the bytes they index, and the readers are written to return an error
+  instead of panicking on a malformed file. A refusal names the offset (and, for a quartet, the file within it) and what
+  was expected. The tests check this on hand-damaged fixtures; the crate has not been fuzzed.
 - Fields whose role is unproven are kept as stored (opaque words, unknown tables listed with their byte spans), not
   guessed. Names keep their original bytes, case and separators.
 - Decoded values are not repaired: a non-finite matrix element, a position outside its stored bounds, an index out of
-  range or a non-unit normal is refused (or, for a mesh variant it does not support, that mesh is marked refused while its
-  siblings decode).
+  range or a non-unit normal is refused (or, for a mesh variant the library does not support, that mesh is marked
+  refused while its siblings decode).
 - Matrices are `Affine` (3x4, column by column) in the game's native frame: left-handed, Y up. Converting frames is the
   caller's.
-- The reader does file I/O only in `Pak::open`; everything else takes bytes.
+- Only `Pak::open` touches the file system; everything else takes bytes. `unsafe` code is denied.
 
 ## What it does not do
 
-- It does not decode pixels: `texture` returns the `CellGcmTexture` descriptor (read by `rsx-reader`), the first stored
-  mip and the stored bytes.
-- It does not decrypt the game's scripts archive, choose which archives make a level, or pick a session.
-- It reads the PS3 disc layout only (32-bit big-endian pointers).
+- It does not decode pixels: `texture` returns the `CellGcmTexture` descriptor (read by
+  [`rsx-reader`](https://github.com/Kalmarv/dx)), the first stored mip and the stored bytes.
+- It does not decrypt the game's scripts archive, choose which archives make a level, or pick a session; it lists and
+  the caller chooses.
+- It does not write any format, render, or decode animation clips (only the reference rigs).
+- It reads the PS3 disc layout only. No other platform or Robomodo title has been tried.
+- It is not on crates.io yet (`publish = false`): it depends on sibling libraries that are still git dependencies, and
+  the API may change before 0.1.0 is released.
 
-## Testing against your own files
+## Tests
 
-`cargo test` runs the synthetic tests. The tests named `*_disc` read the extracted disc (the folder holding
-`PS3_GAME/USRDIR`) and print `SKIP` unless `installs.shred` is set in the machine file the `primase-testdata` loader
-reads; some also use oracle files listed with their registry entries.
+`cargo test --workspace` runs the synthetic tests: hand-laid fixtures built byte by byte, plus two SQLite files written
+by Python's `sqlite3` (`tests/oracles/`). They need no game files. The toolchain is pinned in `rust-toolchain.toml`.
 
-## Licence
+The tests named `*_disc`, and `main_db`, read your own copy of the game and print `SKIP` with the key they need when it
+is not configured. To run them, write a TOML file and point the environment variable `GAME_DATA` at it:
 
-GPL-3.0-or-later.
+```toml
+[installs]
+shred = 'D:/games/shred'          # the folder that holds PS3_GAME/USRDIR, extracted unchanged from your disc
+
+[oracles]
+root = 'D:/oracles'               # <root>/<set>/shred/...: reference files made by independent readers
+
+[run]
+gate = 'smoke'                    # or 'full': how much the heavy tests cover (smoke by default)
+```
+
+[`tests/inputs/README.md`](tests/inputs/README.md) lists every input a test reads, what it is and how it is made (a
+table generated from `tests/inputs/mod.rs`). The layout of the file and its other keys are described in
+[primase-testdata](https://github.com/Kalmarv/primase-testdata#the-configuration-file), which loads it. Two oracle
+sets are used: a dump of `MAIN.DB` made by `tests/oracles/sqlite_dump.py`, and a disassembly of every distinct fragment
+program made with RPCS3's Cg decoder; without them the tests that compare against them skip.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md), which also says how to report a file the library cannot read.
+
+Used by [primase](https://github.com/Kalmarv/primase), a game-asset conversion library.
+
+## License
+
+GPL-3.0-or-later; see [LICENSE](LICENSE).

@@ -23,6 +23,7 @@ pub enum ScriptValue {
 /// through fields (`GAME.Level.GetLevelManager`), and its arguments, each a literal.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct ScriptCall {
+    /// The callee, e.g. `change_fog` or `GAME.Level.GetLevelManager`.
     pub function: String,
     pub args: Vec<ScriptValue>,
 }
@@ -53,11 +54,13 @@ pub struct ScriptInputs<'a> {
     pub level: &'a str,
 }
 
+/// What a read of a level script took and what it left out, with the reason for each call left out.
 #[derive(Clone, Debug, Default)]
 pub struct ParamsReport {
     pub level: String,
     /// The script's name when the archive has one.
     pub script: Option<String>,
+    /// How many calls were read.
     pub read: usize,
     /// Calls not read, each with the instruction it is at and why.
     pub unread: Vec<(usize, String)>,

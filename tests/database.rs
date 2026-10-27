@@ -1,4 +1,4 @@
-//! A database written by Python's sqlite3 (`oracles/make_fixture.py`) and read back by Python (`oracles/dump.py`):
+//! A database written by Python's sqlite3 (`tests/oracles/sqlite_make_fixture.py`) and read back by Python (`tests/oracles/sqlite_dump.py`):
 //! 512-byte pages, two b-tree levels, overflow chains, every integer width, reals, NULLs, a rowid alias.
 #[path = "database_oracle/mod.rs"]
 mod common;

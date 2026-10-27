@@ -1,4 +1,9 @@
-//! Big-endian PAK v4. Names retain their original bytes (no path normalization).
+//! PAK v4 archives: a big-endian table of named entries in sections, each entry stored or CSTR-compressed
+//! ([`crate::cstr`]).
+//!
+//! The whole table is checked when the archive is read: magic, endian tag and version, every entry's name hash (sdbm of
+//! its name), attributes, alignment and payload span, and that the payloads tile the file exactly. Names keep their
+//! original bytes (no path normalisation).
 #![allow(
     clippy::disallowed_methods,
     clippy::disallowed_types,
@@ -9,21 +14,28 @@ use crate::{Result, invalid};
 use primase_foundations::bytes::{Endian::Big, Field, View};
 use std::{borrow::Cow, ops::Range, path::Path};
 
+/// One entry of the archive's table: a file, or a section marker (`attributes == 1`).
 #[derive(Debug)]
 pub struct Entry {
+    /// The name as stored, case and separators included.
     pub name: Vec<u8>,
+    /// sdbm hash of `name`, checked against it when the archive is read.
     pub hash: u32,
     /// Section index; a marker belongs to the section it opens.
     pub section: Option<usize>,
+    /// `0` stored, `1` section marker, `2` CSTR-compressed.
     pub attributes: u32,
     /// Runtime allocation alignment, not file-offset alignment.
     pub alignment: u32,
+    /// Offset of the stored payload in the archive file.
     pub offset: usize,
+    /// Size of the decoded payload.
     pub size: usize,
     /// Zero for stored entries and markers; otherwise the encoded CSTR length.
     pub compressed_size: usize,
 }
 
+/// A named run of entries, opened by a section marker.
 #[derive(Debug)]
 pub struct Section {
     pub name: Vec<u8>,
@@ -40,10 +52,13 @@ pub struct Pak {
 }
 
 impl Pak {
+    /// Read and check the archive at `path`. This is the only function in the crate that touches the file system.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         Self::from_bytes(std::fs::read(path)?)
     }
 
+    /// Check an archive held in memory: magic, endian tag, version, and every entry's hash, attributes, alignment and
+    /// payload span. The payloads must tile the file exactly; a gap, an overlap or trailing bytes are refused with the offset.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         let v = View::new(&bytes);
         if v.slice(0, 4).field("PAK magic")? != b"PAK\0" {
@@ -139,9 +154,11 @@ impl Pak {
         })
     }
 
+    /// Every entry in table order, section markers included.
     pub fn entries(&self) -> &[Entry] {
         &self.entries
     }
+    /// The sections in table order.
     pub fn sections(&self) -> &[Section] {
         &self.sections
     }

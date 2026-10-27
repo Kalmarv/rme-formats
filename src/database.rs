@@ -19,6 +19,7 @@ pub enum Error {
     NoTable(String),
 }
 
+/// A read that is either done or refused with an [`Error`].
 pub type Result<T> = std::result::Result<T, Error>;
 
 fn invalid(detail: impl ToString) -> Error {
@@ -50,7 +51,9 @@ impl From<SqliteValue> for Value {
 /// One row: its rowid and one value per declared column (an `INTEGER PRIMARY KEY` column holds the rowid).
 #[derive(Debug, Clone, PartialEq)]
 pub struct Row {
+    /// The row id.
     pub rowid: i64,
+    /// One value per declared column.
     pub values: Vec<Value>,
 }
 
@@ -73,7 +76,9 @@ impl Table {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TableInfo {
     pub name: String,
+    /// The page of the table's b-tree root.
     pub root_page: u32,
+    /// The text of its `CREATE TABLE`.
     pub sql: String,
 }
 
@@ -94,6 +99,7 @@ impl std::fmt::Debug for Database<'_> {
 const SCHEMA_COLUMNS: [&str; 5] = ["type", "name", "tbl_name", "rootpage", "sql"];
 
 impl<'a> Database<'a> {
+    /// Check the header of the SQLite file `data` and list the tables of its schema.
     pub fn open(data: &'a [u8]) -> Result<Self> {
         let reader = Reader::open(SliceSource::new(data)).map_err(invalid)?;
         let schema = reader.schema().map_err(invalid)?;

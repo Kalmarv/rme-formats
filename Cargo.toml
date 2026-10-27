@@ -1,6 +1,10 @@
 [package]
 name = "rme-formats"
-description = "Readers for Tony Hawk's SHRED (PS3): PAK v4 archives, CSTR blocks, level geometry and SCP tables, material banks, textures, MAIN.DB rows, level scripts and reference rigs"
+description = "Readers for the game data of Tony Hawk's SHRED (PS3): PAK archives, level meshes, materials, textures, MAIN.DB and level scripts"
+keywords = ["ps3", "tony-hawk", "pak", "game-formats", "modding"]
+categories = ["parser-implementations", "game-development"]
+readme = "README.md"
+documentation = "https://docs.rs/rme-formats"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

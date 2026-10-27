@@ -1,5 +1,5 @@
 //! Container structure from the published CgBinaryProgram description, checked
-//! over every packaged shader occurrence. Microcode semantics are a separate gate.
+//! over every packaged shader occurrence. Microcode semantics are checked in fragment_disc.rs.
 mod inputs;
 
 use inputs::{Depth, Game, Query, depth, expect_found, install, seed};

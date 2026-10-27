@@ -23,6 +23,7 @@ pub enum Difficulty {
     Hardcore,
 }
 impl Difficulty {
+    /// The difficulty a layer archive's name encodes (`0`, `8`, `9` or `A`); `None` for any other digit.
     pub fn from_nibble(n: u8) -> Option<Self> {
         match n {
             0 => Some(Self::Base),
@@ -89,6 +90,7 @@ pub struct DropSpot {
     pub start_state: String,
 }
 
+/// The database's levels and session types beside the archives of a disc, sorted into level bases, layers and others.
 #[derive(Clone, Debug, Default)]
 pub struct Manifest {
     pub levels: Vec<LevelRow>,
