@@ -18,8 +18,11 @@ const RECORD: usize = 48;
 const MATRIX: usize = 64;
 
 #[derive(Clone, Debug, PartialEq)]
+/// A spot camera record: two frames placed under a spot name.
 pub struct SpotCamera {
+    /// Offset of the section holding it.
     pub section: usize,
+    /// Its index in the section.
     pub index: u32,
     /// Word 0.
     pub id: u32,
@@ -38,6 +41,7 @@ pub struct SpotCamera {
     pub target: Affine,
 }
 
+/// Read every spot camera of one type 3 section; a section of the wrong size is reported unread and gives none.
 pub fn decode(scp: &[u8], s: &Section, unread: &mut Vec<Unread>) -> Result<Vec<SpotCamera>> {
     let v = View::new(scp);
     let n = s.count as usize;

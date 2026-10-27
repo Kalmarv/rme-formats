@@ -8,7 +8,9 @@ use std::collections::BTreeMap;
 /// Decoded source lanes, padded with zero to four components. Values retain their source encoding's meaning.
 #[derive(Clone, Debug, PartialEq)]
 pub struct VertexInput {
+    /// How many of the four lanes the source encoding stores; the rest are zero.
     pub lanes: u8,
+    /// One entry per vertex, in vertex order.
     pub values: Vec<[f32; 4]>,
 }
 

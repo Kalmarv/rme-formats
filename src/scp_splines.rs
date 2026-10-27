@@ -80,14 +80,19 @@ impl SplineKind {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+/// One spline record as authored.
 pub struct Spline {
     /// Offset of the section holding it, its flags and its index in the section.
     pub section: usize,
+    /// The section's flags.
     pub flags: u32,
+    /// Its index in the section.
     pub index: u32,
+    /// The spline class the section type names.
     pub kind: SplineKind,
     /// sdbm of the spline's name.
     pub id: u32,
+    /// Word 1: the parent group's id.
     pub parent: u32,
     /// Words 5 and 6: the point count and a second count that is equal except in a few records.
     pub counts: [u32; 2],

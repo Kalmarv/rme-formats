@@ -5,29 +5,48 @@ use std::borrow::Cow;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
+/// Why a texture header or copy was refused.
 pub enum Error {
     #[error(transparent)]
+    /// The archive could not be read.
     Archive(#[from] crate::Error),
     #[error("texture header at {offset:#x}: {detail}")]
-    Header { offset: usize, detail: &'static str },
+    /// The 84-byte header is not one.
+    Header {
+        /// Offset in the header.
+        offset: usize,
+        /// What was expected there.
+        detail: &'static str,
+    },
     #[error(transparent)]
+    /// The GCM texture descriptor was refused.
     Gcm(#[from] rsx_reader::gcm::Error),
     #[error("texture {texture}: {detail}")]
-    Copy { texture: usize, detail: &'static str },
+    /// A texture record or one of its pixel copies is missing or ambiguous.
+    Copy {
+        /// The index of the texture record.
+        texture: usize,
+        /// What is wrong.
+        detail: &'static str,
+    },
 }
+/// A texture read that is either done or refused with an [`enum@Error`].
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Exact source header. Unknown words are explicitly exposed, never interpreted
 /// as resource identifiers, names or flags. `raw` also retains the mip-end table.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TextureHeader {
+    /// The 84 header bytes as stored, including the mip-end table.
     pub raw: [u8; 84],
+    /// The GCM texture descriptor from header +60.
     pub gcm: CellGcmTexture,
     /// Unresolved words at 0x10 (two u16s), 0x1c and 0x20.
     pub opaque_words: [(usize, u32); 3],
 }
 
 impl TextureHeader {
+    /// Parse exactly 84 header bytes: the constants, the opaque words and the GCM descriptor with its extents.
     pub fn parse(bytes: &[u8]) -> Result<Self> {
         let raw: [u8; 84] = bytes.try_into().map_err(|_| Error::Header {
             offset: 0,
@@ -117,25 +136,37 @@ impl TextureHeader {
 /// Where the source packaged this copy; no preference is implied.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Residency {
+    /// The header sits in a `*_STREAMED` section.
     Streamed,
+    /// The header sits in a `*_PREFETCH` section.
     Prefetch,
+    /// Any other section, or none.
     Other,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Where a copy's pixels are stored.
 pub struct PixelSource {
+    /// Index of the `.txp` entry in its archive.
     pub entry: usize,
+    /// The first mip level the entry holds.
     pub first_mip: u8,
 }
 
 #[derive(Clone, Debug)]
+/// One packaged texture: its header and where its pixel copies are.
 pub struct TextureRecord {
+    /// Index of the archive in the catalog's input list.
     pub archive: usize,
+    /// Index of the `.thp` entry in that archive.
     pub header_entry: usize,
+    /// The parsed 84-byte header.
     pub header: TextureHeader,
     /// Source path without extension, retaining original bytes and separators.
     pub path: Vec<u8>,
+    /// The section the header entry is in.
     pub section: Option<usize>,
+    /// The residency the section names.
     pub residency: Residency,
     /// None is a header-only entry, not an empty or silently substituted texture.
     pub pixels: Option<PixelSource>,
@@ -144,8 +175,11 @@ pub struct TextureRecord {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Which pixel payload of a texture record.
 pub enum Payload {
+    /// The record's own pixel copy.
     Primary,
+    /// A cube map's separately packaged `_m1.txp` tail.
     CubeTail,
 }
 
@@ -158,6 +192,7 @@ pub struct TextureCatalog<'a> {
 }
 
 impl<'a> TextureCatalog<'a> {
+    /// Index the texture headers (`.thp` entries) of `archives` and find each one's pixel copies; a name that matches more than one entry in the sections that apply is refused.
     pub fn new(archives: &[(&'a str, &'a Pak)]) -> Result<Self> {
         let mut records = Vec::new();
         for (archive, (_, pak)) in archives.iter().enumerate() {
@@ -238,13 +273,16 @@ impl<'a> TextureCatalog<'a> {
         })
     }
 
+    /// Every texture record, in archive then entry order.
     pub fn records(&self) -> &[TextureRecord] {
         &self.records
     }
+    /// The label the caller gave archive `index`.
     pub fn archive_label(&self, index: usize) -> Option<&str> {
         self.archives.get(index).map(|a| a.0)
     }
 
+    /// The name of the section texture record `texture` is in.
     pub fn section_name(&self, texture: usize) -> Option<&[u8]> {
         let record = self.records.get(texture)?;
         let section = record.section?;

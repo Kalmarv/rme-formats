@@ -53,7 +53,7 @@
 //! let error = Pak::from_bytes(header.to_vec()).unwrap_err();
 //! assert_eq!(error.to_string(), "at 0x6: unsupported PAK version");
 //! ```
-#![deny(clippy::disallowed_methods, clippy::disallowed_types)]
+#![deny(clippy::disallowed_methods, clippy::disallowed_types, missing_docs)]
 #![cfg_attr(
     not(test),
     deny(
@@ -97,7 +97,12 @@ pub enum Error {
     Field(#[from] primase_foundations::bytes::FieldError),
     /// The data is not what the format allows, at `offset` in the file or decoded entry being read.
     #[error("at {offset:#x}: {detail}")]
-    Invalid { offset: usize, detail: String },
+    Invalid {
+        /// Where the bad bytes are, in the file or decoded entry being read.
+        offset: usize,
+        /// What was expected there.
+        detail: String,
+    },
     /// A texture header or pixel copy was refused; the inner error keeps its own offset.
     #[error(transparent)]
     Texture(Box<crate::texture::Error>),
@@ -117,6 +122,7 @@ pub(crate) fn invalid(offset: usize, detail: impl ToString) -> Error {
 /// `world = M * local`. Entries are the stored f32 values.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Affine {
+    /// The three columns of the linear part, then the translation, each as x, y, z.
     pub cols: [[f32; 3]; 4],
 }
 

@@ -41,21 +41,29 @@ pub struct Node {
     /// The world-matrix table entry's hash: a group name's hash for group nodes, a model's for single-mesh nodes,
     /// else 0.
     pub matrix_hash: u32,
+    /// The world matrix the node's matrix-table entry points at.
     pub world: Affine,
     /// Words `+0x00..+0x0F` as floats when any is non-zero: centre and radius of a bounding sphere. Unproven: the
     /// centre lies 0.57 to 73 from the node's translation in one checked file.
     pub sphere: Option<[f32; 4]>,
+    /// Indices into the node table.
     pub children: Vec<u32>,
+    /// Indices into the placement table.
     pub placements: Vec<u32>,
 }
 
 /// One blob section header.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Section {
+    /// Offset of the section header in the file.
     pub offset: usize,
+    /// The header's flags; the type is `flags >> 16`.
     pub flags: u32,
+    /// Size of the section, header included.
     pub size: usize,
+    /// The record count.
     pub count: u32,
+    /// Offset of the section's data from its start.
     pub data: usize,
 }
 impl Section {
@@ -74,7 +82,10 @@ pub enum Chain {
     /// The walk reached the 16-byte end record `{junk, 8, 0, 0}` exactly at the end of the file.
     Complete,
     /// A header at `offset` is not a section and the file does not end there: the rest is unread.
-    Stopped { offset: usize },
+    Stopped {
+        /// Where the unread rest of the file starts.
+        offset: usize,
+    },
 }
 
 /// A spot chunk: a `0x200`-byte record and its own 64-byte world matrix.
@@ -82,6 +93,7 @@ pub enum Chain {
 pub struct SpotChunk {
     /// Offset of the section holding it, and its index in the section.
     pub section: usize,
+    /// Its index in the section.
     pub index: u32,
     /// `+0x10`: hash of the chunk's name (a DB spot name, lower-cased or as written).
     pub name: u32,
@@ -97,19 +109,30 @@ pub struct SpotChunk {
     pub pair: [u32; 2],
     /// The node whose `id` equals `id`, when there is one.
     pub node: Option<u32>,
+    /// The chunk's own world matrix.
     pub world: Affine,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
+/// What `decode` read from one SCP.
 pub struct Tables {
+    /// The node table.
     pub nodes: Vec<Node>,
+    /// Every blob section, whether or not it is decoded.
     pub sections: Vec<Section>,
+    /// How the section chain ended.
     pub chain: Chain,
+    /// The spot chunks of the type 2 sections.
     pub spots: Vec<SpotChunk>,
+    /// The splines of the spline sections.
     pub splines: Vec<Spline>,
+    /// The lights of the type 4 sections.
     pub lights: Vec<SceneLight>,
+    /// The spot cameras of the type 3 sections.
     pub cameras: Vec<SpotCamera>,
+    /// The locators of the type 5 sections.
     pub locators: Vec<Locator>,
+    /// The occluders of the type 0xb sections.
     pub occluders: Vec<Occluder>,
 }
 

@@ -19,15 +19,20 @@ use std::{
 /// A span of a quartet file the reader accounts for but does not decode, with why.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Unread {
+    /// Which quartet file the span is in: `scp`, `mlp`, `mmp` or `mgp`.
     pub file: &'static str,
+    /// Offset of the span in that decoded file.
     pub offset: usize,
+    /// Length of the span in bytes.
     pub bytes: usize,
+    /// Why the span is not decoded.
     pub reason: &'static str,
 }
 
 /// A run of a model's indices drawn with one material.
 #[derive(Clone, Debug)]
 pub struct Submesh {
+    /// The range of the model's index list.
     pub indices: Range<usize>,
     /// The material id (resolve it with [`crate::library::MaterialLibrary::resolve`]).
     pub material: u32,
@@ -38,13 +43,19 @@ pub struct Submesh {
 /// One mesh of a quartet, in source coordinates.
 #[derive(Clone, Debug)]
 pub struct Model {
+    /// The model id from the `.mlp` resource table.
     pub id: u32,
     /// The stored axis-aligned bounds, `[min, max]`.
     pub bounds: [[f32; 3]; 2],
+    /// One position per vertex; empty when the model is refused.
     pub positions: Vec<[f32; 3]>,
+    /// The vertex format mask.
     pub format: u32,
+    /// The per-vertex data besides positions.
     pub attributes: Attributes,
+    /// The processed skin vertices, for a skinned model.
     pub processed: Option<Vec<SourceSkinVertex>>,
+    /// How many bone-palette batches the processed skin stream holds.
     pub processed_batches: usize,
     /// Triangle-list indices into `positions`.
     pub indices: Vec<u32>,
@@ -57,11 +68,15 @@ pub struct Model {
 /// An instance of a model in the level: its transform and name hash.
 #[derive(Clone, Debug)]
 pub struct Placement {
+    /// The id of the model placed.
     pub id: u32,
+    /// The placement's world matrix.
     pub transform: Affine,
     /// Offset of this 48-byte record in its SCP, all source words, and its name hash (+0x0c).
     pub offset: usize,
+    /// The 12 words of the record as stored.
     pub words: [u32; 12],
+    /// The name hash (word 3).
     pub name: u32,
 }
 

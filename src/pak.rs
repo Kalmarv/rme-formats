@@ -42,6 +42,7 @@ pub struct Entry {
 /// A named run of entries, opened by a section marker.
 #[derive(Debug)]
 pub struct Section {
+    /// The name as stored, case and separators included.
     pub name: Vec<u8>,
     /// Includes this section's marker entry.
     pub entries: Range<usize>,

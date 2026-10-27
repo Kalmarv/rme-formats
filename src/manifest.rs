@@ -17,9 +17,13 @@ use crate::{pak::Pak, scene};
 /// A layer archive's difficulty nibble.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Difficulty {
+    /// Nibble `0`: the level's base archive.
     Base,
+    /// Nibble `8`.
     Casual,
+    /// Nibble `9`.
     Confident,
+    /// Nibble `A`.
     Hardcore,
 }
 impl Difficulty {
@@ -40,9 +44,11 @@ impl Difficulty {
 pub struct LayerPak {
     /// The archive's file name as supplied, e.g. `8100000C.PAK`.
     pub file: String,
+    /// The difficulty nibble of the file name.
     pub difficulty: Difficulty,
     /// `session_types.id`; [`Manifest::session_type`] names it.
     pub session_type: u8,
+    /// The map id byte of the file name.
     pub map_id: u8,
     /// The quartet stems it holds, e.g. `levels\charlie\trainingsession1\trainingsession1`.
     pub quartets: Vec<Vec<u8>>,
@@ -51,6 +57,7 @@ pub struct LayerPak {
 /// A level's base archive.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BasePak {
+    /// The archive's file name as supplied.
     pub file: String,
     /// The level folder name of its quartets, lower-case as stored.
     pub level: String,
@@ -59,17 +66,24 @@ pub struct BasePak {
 /// An archive that is neither (named and filled unlike a layer or a base): reported, not guessed.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OtherPak {
+    /// The archive's file name as supplied.
     pub file: String,
+    /// Why the archive is neither a layer nor a base.
     pub reason: String,
 }
 
 /// A row of the database's `levels` table (the text columns the manifest needs, as stored).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LevelRow {
+    /// The level's id in the database.
     pub id: u32,
+    /// The level's `NAME` column.
     pub name: String,
+    /// The level's `DISPLAY_NAME` column.
     pub display_name: String,
+    /// The level's `PATH` column.
     pub path: String,
+    /// The level's `BOARD_TYPE` column.
     pub board_type: String,
     /// `SESSIONS`: the `&`-separated session ids.
     pub sessions: Vec<u32>,
@@ -80,23 +94,34 @@ pub struct LevelRow {
 /// A row of `<Level>_dropspots`: where the player may start, as stored.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DropSpot {
+    /// The row's `id` column.
     pub id: u32,
+    /// The session's `NAME` column.
     pub name: String,
+    /// The session's `NAV_SET_START` column.
     pub nav_set_start: String,
+    /// The session's `NAV_INDEX_START` column.
     pub nav_index_start: String,
     /// The spot chunk's name; `-1` or `na` where the row has none.
     pub spot_name: String,
+    /// The session's `START_SPEED` column.
     pub start_speed: String,
+    /// The session's `START_STATE` column.
     pub start_state: String,
 }
 
 /// The database's levels and session types beside the archives of a disc, sorted into level bases, layers and others.
 #[derive(Clone, Debug, Default)]
 pub struct Manifest {
+    /// The database's levels, in table order.
     pub levels: Vec<LevelRow>,
+    /// The database's session types as `(id, name)`.
     pub session_types: Vec<(u32, String)>,
+    /// The archives that are a level's base quartet.
     pub bases: Vec<BasePak>,
+    /// The archives that are difficulty layers.
     pub layers: Vec<LayerPak>,
+    /// The archives that are neither.
     pub others: Vec<OtherPak>,
 }
 

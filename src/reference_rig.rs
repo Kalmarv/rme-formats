@@ -7,32 +7,49 @@ use morpheme_formats::Rig;
 /// The caller selects the archive and the exact extensionless animation-container entry.
 #[derive(Debug)]
 pub struct Archive<'a> {
+    /// A label for the archive in diagnostics and records.
     pub label: &'a str,
+    /// The archive that holds the entry.
     pub pak: &'a Pak,
+    /// The exact, extensionless entry name.
     pub entry: &'a [u8],
 }
 
 /// A bundle record that is not a type 1 reference rig; only its identity and size are kept.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UninterpretedAsset {
+    /// The label of the archive the record came from.
     pub pak: String,
+    /// The animation-container entry the record came from.
     pub entry: Vec<u8>,
+    /// Offset of the record in the decoded container.
     pub offset: usize,
+    /// The record's asset type.
     pub asset_type: u32,
+    /// The record's asset id.
     pub asset_id: u32,
+    /// The record's GUID.
     pub guid: [u8; 16],
+    /// Size of the record's payload in bytes.
     pub bytes: usize,
 }
 
 /// Counts over the bundles read.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Report {
+    /// Bundles added.
     pub bundles: usize,
+    /// Bundles that held no reference rig.
     pub bundles_without_rigs: usize,
+    /// Records in all bundles, rigs and others.
     pub records: usize,
+    /// Reference rigs; each is kept in its authored rig space with its header transform, with no render-skeleton conversion.
     pub rigs: usize,
+    /// Joints over all rigs.
     pub joints: usize,
+    /// Bytes of record padding.
     pub padding_bytes: usize,
+    /// The records that are not type 1 reference rigs.
     pub uninterpreted_assets: Vec<UninterpretedAsset>,
     /// Rigs that retain their type 1 payload ([`ReferenceRig::source_payload`] is not empty): the auxiliary tables
     /// and header fields outside the reference joints stay available to the caller.
@@ -63,12 +80,19 @@ impl Report {
 /// One type 1 record of a bundle: a reference rig in its authored rig space.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ReferenceRig {
+    /// The label of the archive the record came from.
     pub pak: String,
+    /// The animation-container entry the record came from.
     pub entry: Vec<u8>,
+    /// Offset of the record in the decoded container.
     pub record_offset: usize,
+    /// The record's asset id.
     pub asset_id: u32,
+    /// The record's GUID.
     pub guid: [u8; 16],
+    /// The record header's word that is not otherwise assigned a meaning.
     pub header_word: u32,
+    /// The rig as the Morpheme reader returns it.
     pub rig: Rig,
     /// Original type 1 payload, retaining auxiliary tables and header fields not yet assigned meanings.
     /// Padding and serialized runtime-pointer words are not required to be zero.
@@ -81,16 +105,25 @@ pub enum MatrixError {
     /// A joint names a parent that is not a joint of the rig.
     #[error("joint {joint} names parent {parent}, but the rig has {joints} joints")]
     ParentOutsideRig {
+        /// The joint that names the parent.
         joint: usize,
+        /// The parent index it names.
         parent: u32,
+        /// How many joints the rig has.
         joints: usize,
     },
     /// A joint is its own ancestor.
     #[error("joint {joint} is its own ancestor: cyclic reference hierarchy")]
-    Cycle { joint: usize },
+    Cycle {
+        /// A joint on the cycle.
+        joint: usize,
+    },
     /// A global matrix has a NaN or infinite entry.
     #[error("joint {joint}: nonfinite global reference matrix")]
-    NonFinite { joint: usize },
+    NonFinite {
+        /// The joint whose global matrix is not finite.
+        joint: usize,
+    },
 }
 
 impl ReferenceRig {
@@ -177,7 +210,9 @@ pub struct Bundle {
     pub records: usize,
     /// Bytes of record padding.
     pub padding_bytes: usize,
+    /// The reference rigs, in record order.
     pub rigs: Vec<ReferenceRig>,
+    /// The records that are not reference rigs.
     pub uninterpreted: Vec<UninterpretedAsset>,
 }
 

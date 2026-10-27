@@ -7,14 +7,18 @@ use std::collections::BTreeMap;
 /// One exact token of an IDENTIFIERS cell and its case-sensitive sdbm.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct SessionIdentifier {
+    /// The token as written in the cell.
     pub name: String,
+    /// sdbm of `name`, case-sensitive.
     pub hash: u32,
 }
 
 /// All cells of a row, including unknown columns and unparsed relationship expressions.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct SessionRow {
+    /// The row's SQLite rowid.
     pub rowid: i64,
+    /// The row's `id` column.
     pub id: u32,
     /// MAIN.DB stores these columns as TEXT. SQL NULL remains distinct from an empty string.
     pub fields: BTreeMap<String, Option<String>>,
@@ -26,14 +30,21 @@ pub struct SessionRow {
 /// No active session or task state is chosen; TASKS_OPT brackets/ranges remain authored text.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct SessionGraph {
+    /// The level's id.
     pub level_id: u32,
+    /// The level's row.
     pub level: SessionRow,
+    /// The name of the level's session table.
     pub session_table: String,
+    /// The name of the level's goal table.
     pub goal_table: String,
+    /// The name of the level's task table.
     pub task_table: String,
     /// Source rowid order, including duplicate logical IDs (observed in Papa_tasks).
     pub sessions: Vec<SessionRow>,
+    /// The level's goal rows.
     pub goals: Vec<SessionRow>,
+    /// The level's task rows.
     pub tasks: Vec<SessionRow>,
 }
 

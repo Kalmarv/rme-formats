@@ -9,13 +9,16 @@ use std::collections::{BTreeMap, BTreeSet};
 /// IDs are local to a bank: ID zero occurs in all three banks.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub struct MaterialKey {
+    /// The bank the material comes from: `actors`, `characters` or `environments`.
     pub bank: String,
+    /// The material id, local to the bank.
     pub id: u32,
 }
 
 /// A constant of a material: four floats under a name hash.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct MaterialParameter {
+    /// The name hash that keys the constant.
     pub hash: u32,
     /// Only named by an exact sdbm join against this material's fragment program.
     pub name: Option<String>,
@@ -30,9 +33,11 @@ pub struct MaterialParameter {
 pub struct MaterialSampler {
     /// Descriptor ordinal; no claim that this is a hardware texture unit.
     pub slot: u32,
+    /// The sampler's name hash.
     pub hash: u32,
     /// Exact sdbm join against an engine string; not Cg reflection or inferred use.
     pub name: Option<String>,
+    /// How `name` was found.
     pub name_source: Option<SamplerNameSource>,
     /// Empty is a source empty binding, not a generated default texture.
     pub texture: String,
@@ -50,12 +55,17 @@ pub enum SamplerNameSource {
 /// A bank material, retained as authored: no shading conversion and no render-state guesses.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct ShredMaterial {
+    /// The bank and id.
     pub key: MaterialKey,
     /// Header +0x1c, +0x28, +0x2c, +0x3c, respectively.
     pub unknown_header: [u32; 4],
+    /// The vertex shader's name.
     pub vertex_shader: String,
+    /// The fragment shader's name.
     pub fragment_shader: String,
+    /// The constants, in stored order.
     pub parameters: Vec<MaterialParameter>,
+    /// The texture bindings, in stored order.
     pub samplers: Vec<MaterialSampler>,
 }
 

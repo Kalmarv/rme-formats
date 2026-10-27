@@ -14,15 +14,20 @@ use std::collections::{BTreeMap, BTreeSet};
 /// material reference on the disc, but is not a native-loader observation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub enum BankEvidence {
+    /// The id is held by exactly one bank.
     UniqueId,
+    /// Id zero is held by every bank; the bank was chosen from the quartet namespace, an inference.
     InferredQuartetNamespace,
 }
 
 /// The banks that hold a material id and the one chosen for it, with why.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct MaterialResolution {
+    /// Every bank that holds the id, in key order.
     pub candidates: Vec<MaterialKey>,
+    /// The bank chosen for the id, when the rules choose one.
     pub selected: Option<MaterialKey>,
+    /// Why that bank was chosen; `None` when none was.
     pub evidence: Option<BankEvidence>,
 }
 

@@ -33,8 +33,11 @@ fn segments(flags: u32) -> Option<usize> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+/// An occluder: a world matrix and the line segments of its outline.
 pub struct Occluder {
+    /// Offset of the section holding it.
     pub section: usize,
+    /// Its index in the section.
     pub index: u32,
     /// Word 0.
     pub name: u32,
@@ -46,6 +49,7 @@ pub struct Occluder {
     pub outline: Vec<[[f32; 3]; 2]>,
 }
 
+/// Read every occluder of one type 0xb section; a section that does not tile is reported unread and gives none.
 pub fn decode(scp: &[u8], s: &Section, unread: &mut Vec<Unread>) -> Result<Vec<Occluder>> {
     let v = View::new(scp);
     let n = s.count as usize;

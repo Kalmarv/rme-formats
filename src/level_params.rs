@@ -13,9 +13,13 @@ use serde::Serialize;
 /// A literal argument of a level script's call.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub enum ScriptValue {
+    /// The script's `nil`.
     Nil,
+    /// A boolean constant.
     Bool(bool),
+    /// A number constant.
     Number(f64),
+    /// A string constant.
     Text(String),
 }
 
@@ -25,6 +29,7 @@ pub enum ScriptValue {
 pub struct ScriptCall {
     /// The callee, e.g. `change_fog` or `GAME.Level.GetLevelManager`.
     pub function: String,
+    /// The constant arguments, in call order.
     pub args: Vec<ScriptValue>,
 }
 
@@ -37,6 +42,7 @@ pub struct LevelParams {
     pub level: String,
     /// The script's name in the archive, as stored.
     pub script: String,
+    /// The calls with constant-only arguments, in script order.
     pub calls: Vec<ScriptCall>,
 }
 
@@ -50,13 +56,16 @@ impl LevelParams {
 /// The scripts archive and the level whose script to read (`charlie`, `mike`, ...).
 #[derive(Clone, Copy, Debug)]
 pub struct ScriptInputs<'a> {
+    /// The archive that holds the level scripts.
     pub scripts: &'a Pak,
+    /// The level whose parameter script is read, as the database names it.
     pub level: &'a str,
 }
 
 /// What a read of a level script took and what it left out, with the reason for each call left out.
 #[derive(Clone, Debug, Default)]
 pub struct ParamsReport {
+    /// The level whose script was read.
     pub level: String,
     /// The script's name when the archive has one.
     pub script: Option<String>,

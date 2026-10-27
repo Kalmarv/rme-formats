@@ -11,6 +11,10 @@ cargo test --workspace
 RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
 ```
 
+The library code denies `clippy::indexing_slicing`, `clippy::arithmetic_side_effects` and
+`clippy::cast_possible_truncation`: read bytes through `View` or `scene::Bytes`, sum stored offsets with
+`crate::offset` or `crate::element`, and convert sizes with `try_from`. The test code is exempt.
+
 `cargo test` needs no game files. The tests that read a real disc skip, and print the key they need, unless the
 environment variable `GAME_DATA` names a TOML file that points at your own copy of the game; the README's "Tests"
 section and [tests/inputs/README.md](tests/inputs/README.md) say how. A change to a reader should come with a test on a

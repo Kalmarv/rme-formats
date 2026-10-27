@@ -16,8 +16,11 @@ const RECORD: usize = 80;
 const MATRIX: usize = 64;
 
 #[derive(Clone, Debug, PartialEq)]
+/// A light record as authored; what it means to a renderer is not established.
 pub struct SceneLight {
+    /// Offset of the section holding it.
     pub section: usize,
+    /// Its index in the section.
     pub index: u32,
     /// Word 8, by count in the level SCPs: 0 (5,251), 7 (4,079), 8 (398), 1 (23, named `Sun` where the name
     /// resolves), 4 (23), 3 (4, with a texture name in the buffer: `gobo_star`, `gobo_circle`). Not a proven vocabulary.
@@ -30,6 +33,7 @@ pub struct SceneLight {
     pub params: [f32; 3],
     /// Words 9 to 12 and 14, 15.
     pub links: [u32; 4],
+    /// Words 14 and 15.
     pub tail_words: [u32; 2],
     /// Words 16 to 19: leftover bytes of the editor's name buffer, kept raw.
     pub buffer: [u8; 16],
@@ -37,6 +41,7 @@ pub struct SceneLight {
     pub world: Affine,
 }
 
+/// Read every light of one type 4 section; a section of the wrong size is reported unread and gives none.
 pub fn decode(scp: &[u8], s: &Section, unread: &mut Vec<Unread>) -> Result<Vec<SceneLight>> {
     let v = View::new(scp);
     let n = s.count as usize;

@@ -15,7 +15,12 @@ pub enum PixelProgram {
     Unclassified,
     /// Samples texture unit `unit` at the first texture coordinate and only copies or multiplies the sample with the
     /// uniforms `uniforms` (by their program names): no normal, light, fog or other interpolant is read.
-    ScaledTexture { unit: u32, uniforms: Vec<String> },
+    ScaledTexture {
+        /// The texture unit sampled.
+        unit: u32,
+        /// The uniforms' names, in first-use order.
+        uniforms: Vec<String>,
+    },
 }
 
 /// The fragment input register of the first texture coordinate (RSX: position, two colours, fog, then TEX0).

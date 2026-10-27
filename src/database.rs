@@ -16,6 +16,7 @@ pub enum Error {
     #[error("{0}")]
     Invalid(String),
     #[error("no table {0:?}")]
+    /// The database has no table of this name.
     NoTable(String),
 }
 
@@ -29,10 +30,15 @@ fn invalid(detail: impl ToString) -> Error {
 /// One stored value.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
+    /// SQL NULL.
     Null,
+    /// An integer column value.
     Int(i64),
+    /// A real column value.
     Real(f64),
+    /// A text column value.
     Text(String),
+    /// A blob column value.
     Blob(Vec<u8>),
 }
 
@@ -60,8 +66,11 @@ pub struct Row {
 /// A table read whole.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Table {
+    /// The table's name as the database stores it.
     pub name: String,
+    /// The column names in table order.
     pub columns: Vec<String>,
+    /// The rows, in stored order.
     pub rows: Vec<Row>,
 }
 
@@ -75,6 +84,7 @@ impl Table {
 /// A table the schema lists: where its b-tree is and the `CREATE TABLE` text.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TableInfo {
+    /// The table's name as the database stores it.
     pub name: String,
     /// The page of the table's b-tree root.
     pub root_page: u32,

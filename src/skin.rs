@@ -9,7 +9,9 @@ use std::ops::Range;
 /// One bone of a mesh's source skeleton, as its SCP stores it.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SourceBone {
+    /// The bone's two leading words.
     pub words: [u32; 2],
+    /// The bone's name without its terminator.
     pub name: Vec<u8>,
     /// Original SCP matrix; its space and the two words' runtime roles remain unproved.
     pub matrix: Affine,
@@ -18,12 +20,15 @@ pub struct SourceBone {
 /// One source vertex's palette and quantized weights. 255 is an inactive bone, with zero weight.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SourceSkinVertex {
+    /// The four palette bones; 255 is an inactive slot.
     pub bones: [u8; 4],
+    /// The four 8-bit weights, which sum to 255.
     pub weights: [u8; 4],
     /// Original float bits, including stock NaNs.
     pub normal_bits: [u32; 3],
     /// Source +28, whose output colour role is unproved.
     pub extra: u32,
+    /// The eight padding bytes of the record as stored.
     pub padding: [u8; 8],
 }
 
