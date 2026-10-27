@@ -200,3 +200,45 @@ fn damage_is_refused_or_reported() {
         let _ = scp_tables::decode(&ok[..n]);
     }
 }
+
+/// Hostile bytes: every aligned word of the fixture replaced by boundary values is refused, reported or decoded,
+/// never a panic.
+#[test]
+fn mutated_words_never_panic() {
+    let ok = fixture();
+    let mut panics = Vec::new();
+    for at in (0..ok.len() - 3).step_by(4) {
+        let old = u32::from_be_bytes(ok[at..at + 4].try_into().unwrap());
+        for value in [
+            0,
+            1,
+            old.wrapping_add(1),
+            old.wrapping_sub(1),
+            old.wrapping_mul(2),
+            ok.len() as u32,
+            ok.len() as u32 + 16,
+            0x7fff_ffff,
+            0x8000_0000,
+            u32::MAX,
+            u32::MAX - 1,
+        ] {
+            let mut b = ok.clone();
+            word(&mut b, at, value);
+            if std::panic::catch_unwind(|| scp_tables::decode(&b)).is_err() {
+                panics.push((at, value));
+            }
+        }
+    }
+    assert!(panics.is_empty(), "panics (offset, value): {panics:?}");
+}
+
+#[test]
+fn a_blob_offset_past_the_file_is_refused_at_the_header_field() {
+    let mut b = vec![0u8; 0x48];
+    word(&mut b, 0x44, 0x1000);
+    let error = scp_tables::decode(&b).unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        "at 0x44: scp: blob offset 0x1000 is past the end of the 0x48-byte file"
+    );
+}

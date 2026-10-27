@@ -373,3 +373,56 @@ fn every_packed_layout_family_and_source_lanes() {
     let n = rme_formats::attributes::cmp(0x80000400); // x=-1024, y=0, z=-512.
     assert_eq!(n, [-32768. / 32767., 0., -32768. / 32767.]);
 }
+
+/// Hostile bytes: every aligned word of every file of the hand-built quartets, replaced by boundary values, is
+/// refused or decoded, never a panic.
+#[test]
+fn mutated_words_never_panic() {
+    use std::panic::{AssertUnwindSafe, catch_unwind};
+    let fixtures = [Fixture::new(), Fixture::processed(), Fixture::attributes(0x807fd, 40)];
+    let mut panics = Vec::new();
+    for (n, fixture) in fixtures.iter().enumerate() {
+        for file in 0..4 {
+            let len = [&fixture.scp, &fixture.mlp, &fixture.mmp, &fixture.mgp][file].len();
+            for at in (0..len.saturating_sub(3)).step_by(4) {
+                let old = [&fixture.scp, &fixture.mlp, &fixture.mmp, &fixture.mgp][file][at..at + 4]
+                    .try_into()
+                    .map(u32::from_be_bytes)
+                    .unwrap();
+                for value in [
+                    0,
+                    1,
+                    2,
+                    3,
+                    old.wrapping_add(1),
+                    old.wrapping_sub(1),
+                    old.wrapping_mul(2),
+                    len as u32,
+                    len as u32 + 16,
+                    0x7fff_ffff,
+                    0x8000_0000,
+                    u32::MAX,
+                    u32::MAX - 1,
+                ] {
+                    let mut f = Fixture {
+                        scp: fixture.scp.clone(),
+                        mlp: fixture.mlp.clone(),
+                        mmp: fixture.mmp.clone(),
+                        mgp: fixture.mgp.clone(),
+                    };
+                    let bytes = match file {
+                        0 => &mut f.scp,
+                        1 => &mut f.mlp,
+                        2 => &mut f.mmp,
+                        _ => &mut f.mgp,
+                    };
+                    word(bytes, at, value);
+                    if catch_unwind(AssertUnwindSafe(|| f.decode())).is_err() {
+                        panics.push((n, file, at, value));
+                    }
+                }
+            }
+        }
+    }
+    assert!(panics.is_empty(), "panics (fixture, file, offset, value): {panics:?}");
+}

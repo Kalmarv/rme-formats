@@ -190,3 +190,52 @@ fn engine_dictionary_names_are_exact_hashes() {
     }
     assert_eq!(material::sampler_name(999), None);
 }
+
+/// Hostile bytes: every aligned word of the record and the bank index replaced by boundary values is refused or
+/// decoded, never a panic.
+#[test]
+fn mutated_words_never_panic() {
+    let record = fixture();
+    let index = index();
+    let mut panics = Vec::new();
+    let values = |old: u32, len: usize| {
+        [
+            0,
+            1,
+            old.wrapping_add(1),
+            old.wrapping_sub(1),
+            old.wrapping_mul(2),
+            len as u32,
+            0x7fff_ffff,
+            0x8000_0000,
+            u32::MAX,
+            u32::MAX - 1,
+        ]
+    };
+    for at in (0..record.len() - 3).step_by(4) {
+        for value in values(u32::from_be_bytes(record[at..at + 4].try_into().unwrap()), record.len()) {
+            let mut b = record.clone();
+            put(&mut b, at, value);
+            let names = UniformNames::new();
+            if std::panic::catch_unwind(|| {
+                let _ = material::record("env", &b, &names);
+                let _ = material::bank("env", &index, &b, |_| Ok(UniformNames::new()));
+                let _ = material::fragment_uniform_names(&b);
+            })
+            .is_err()
+            {
+                panics.push(("record", at, value));
+            }
+        }
+    }
+    for at in (0..index.len() - 3).step_by(4) {
+        for value in values(u32::from_be_bytes(index[at..at + 4].try_into().unwrap()), index.len()) {
+            let mut i = index.clone();
+            put(&mut i, at, value);
+            if std::panic::catch_unwind(|| material::bank("env", &i, &record, |_| Ok(UniformNames::new()))).is_err() {
+                panics.push(("index", at, value));
+            }
+        }
+    }
+    assert!(panics.is_empty(), "panics (input, offset, value): {panics:?}");
+}

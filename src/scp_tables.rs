@@ -267,6 +267,12 @@ pub fn decode(scp: &[u8]) -> Result<(Tables, Vec<Unread>)> {
         tables.chain = Chain::None;
         return Ok((tables, unread));
     }
+    if blob > scp.len() {
+        return Err(invalid(
+            0x44,
+            format!("scp: blob offset {blob:#x} is past the end of the {:#x}-byte file", scp.len()),
+        ));
+    }
     let mut o = blob;
     let chain = loop {
         if o + 16 == scp.len() {
@@ -356,7 +362,7 @@ pub fn decode(scp: &[u8]) -> Result<(Tables, Vec<Unread>)> {
         unread.push(Unread {
             file: "scp",
             offset,
-            bytes: scp.len() - offset,
+            bytes: scp.len().saturating_sub(offset),
             reason: "section chain stops: the next header is not a section",
         });
     }

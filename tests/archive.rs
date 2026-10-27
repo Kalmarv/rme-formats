@@ -147,3 +147,38 @@ fn cstr_refusals_and_lazy_decode() {
     let p = Pak::from_bytes(b).unwrap(); // metadata does not inflate payloads
     assert!(p.payload(3).is_err());
 }
+
+/// Hostile bytes: every aligned word of the archive and the CSTR stream replaced by boundary values is refused or
+/// decoded, never a panic; a decoded archive's entries all answer `payload`.
+#[test]
+fn mutated_words_never_panic() {
+    let mut panics = Vec::new();
+    for (name, base) in [("pak", archive()), ("cstr", stream())] {
+        for at in (0..base.len() - 3).step_by(2) {
+            for value in [0, 1, 2, 0x7fff, 0x8000, 0xffff, 0x7fff_ffff, 0x8000_0000, u32::MAX, u32::MAX - 1] {
+                let mut b = base.clone();
+                if at % 4 == 0 {
+                    word(&mut b, at, value);
+                } else {
+                    b[at..at + 2].copy_from_slice(&(value as u16).to_be_bytes());
+                }
+                let outcome = std::panic::catch_unwind(|| {
+                    if name == "pak" {
+                        if let Ok(pak) = Pak::from_bytes(b.clone()) {
+                            for i in 0..pak.entries().len() {
+                                let _ = pak.payload(i);
+                            }
+                        }
+                    } else {
+                        let _ = cstr::decode(&b, 6);
+                        let _ = cstr::decode(&b, value as usize);
+                    }
+                });
+                if outcome.is_err() {
+                    panics.push((name, at, value));
+                }
+            }
+        }
+    }
+    assert!(panics.is_empty(), "panics (input, offset, value): {panics:?}");
+}
