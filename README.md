@@ -61,8 +61,7 @@ fn main() -> Result<(), rme_formats::Error> {
   the caller chooses.
 - It does not write any format, render, or decode animation clips (only the reference rigs).
 - It reads the PS3 disc layout only. No other platform or Robomodo title has been tried.
-- It is not on crates.io yet (`publish = false`): it depends on sibling libraries that are still git dependencies, and
-  the API may change before 0.1.0 is released.
+- Its API is not settled: as a 0.x crate, a minor release (0.2) may change it.
 
 ## Tests
 
