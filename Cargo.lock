@@ -354,7 +354,7 @@ checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
 [[package]]
 name = "lua51-bytecode"
 version = "0.1.0"
-source = "git+https://github.com/Kalmarv/lua51-bytecode?rev=6f69e17dfd5b4413dc04c0862acdce5b4f21582a#6f69e17dfd5b4413dc04c0862acdce5b4f21582a"
+source = "git+https://github.com/Kalmarv/lua51-bytecode?rev=7060ef7d8f2bd3adc48c9bc5853945231aba05c3#7060ef7d8f2bd3adc48c9bc5853945231aba05c3"
 dependencies = [
  "primase-foundations",
  "thiserror",
@@ -394,7 +394,7 @@ dependencies = [
 [[package]]
 name = "morpheme-formats"
 version = "0.1.0"
-source = "git+https://github.com/Kalmarv/morpheme-formats?rev=ccd6cde9b7614d2927403991f834ab0dc8fb6cc9#ccd6cde9b7614d2927403991f834ab0dc8fb6cc9"
+source = "git+https://github.com/Kalmarv/morpheme-formats?rev=bec4fb142111be5bba3c5b95f48f6a91357e8973#bec4fb142111be5bba3c5b95f48f6a91357e8973"
 dependencies = [
  "primase-foundations",
  "thiserror",
@@ -430,7 +430,7 @@ checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 [[package]]
 name = "primase-foundations"
 version = "0.1.0"
-source = "git+https://github.com/Kalmarv/primase-foundations?rev=8dd2fb8caa84eb22b6998655550f1cf288ca6b93#8dd2fb8caa84eb22b6998655550f1cf288ca6b93"
+source = "git+https://github.com/Kalmarv/primase-foundations?rev=dc4369b73343f3e0d81adc47f2e504027efc1d5a#dc4369b73343f3e0d81adc47f2e504027efc1d5a"
 dependencies = [
  "flate2",
  "half",
@@ -457,7 +457,7 @@ dependencies = [
 [[package]]
 name = "primase-testdata"
 version = "0.1.0"
-source = "git+https://github.com/Kalmarv/primase-testdata?rev=3d70d5ce04d0335b41d359fbfc7d6d5a714b581d#3d70d5ce04d0335b41d359fbfc7d6d5a714b581d"
+source = "git+https://github.com/Kalmarv/primase-testdata?rev=d0258530ca9ca0ca74e957716ae8683e7facc8a7#d0258530ca9ca0ca74e957716ae8683e7facc8a7"
 dependencies = [
  "serde_json",
  "thiserror",
@@ -537,7 +537,7 @@ dependencies = [
 [[package]]
 name = "rsx-reader"
 version = "0.1.0"
-source = "git+https://github.com/Kalmarv/dx?rev=cfb08239b8bb177d65a44cdd182cbfebd942dd93#cfb08239b8bb177d65a44cdd182cbfebd942dd93"
+source = "git+https://github.com/Kalmarv/dx?rev=ab07f2b27e9f154508c4502ac8b61134b7e34b08#ab07f2b27e9f154508c4502ac8b61134b7e34b08"
 dependencies = [
  "primase-foundations",
  "thiserror",

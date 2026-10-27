@@ -43,12 +43,12 @@ publish = false
 
 [workspace.dependencies]
 half = { version = "=2.7.1", default-features = false }
-lua51-bytecode = { git = "https://github.com/Kalmarv/lua51-bytecode", rev = "6f69e17dfd5b4413dc04c0862acdce5b4f21582a" }
-morpheme-formats = { git = "https://github.com/Kalmarv/morpheme-formats", rev = "ccd6cde9b7614d2927403991f834ab0dc8fb6cc9" }
-primase-foundations = { git = "https://github.com/Kalmarv/primase-foundations", rev = "8dd2fb8caa84eb22b6998655550f1cf288ca6b93" }
-primase-testdata = { git = "https://github.com/Kalmarv/primase-testdata", rev = "3d70d5ce04d0335b41d359fbfc7d6d5a714b581d" }
+lua51-bytecode = { git = "https://github.com/Kalmarv/lua51-bytecode", rev = "7060ef7d8f2bd3adc48c9bc5853945231aba05c3" }
+morpheme-formats = { git = "https://github.com/Kalmarv/morpheme-formats", rev = "bec4fb142111be5bba3c5b95f48f6a91357e8973" }
+primase-foundations = { git = "https://github.com/Kalmarv/primase-foundations", rev = "dc4369b73343f3e0d81adc47f2e504027efc1d5a" }
+primase-testdata = { git = "https://github.com/Kalmarv/primase-testdata", rev = "d0258530ca9ca0ca74e957716ae8683e7facc8a7" }
 quantydb-sqlite = { version = "=0.4.0", default-features = false }
-rsx-reader = { git = "https://github.com/Kalmarv/dx", rev = "cfb08239b8bb177d65a44cdd182cbfebd942dd93" }
+rsx-reader = { git = "https://github.com/Kalmarv/dx", rev = "ab07f2b27e9f154508c4502ac8b61134b7e34b08" }
 serde = { version = "1", default-features = false, features = ["std", "derive"] }
 serde_json = { version = "=1.0.154", default-features = false, features = ["std", "preserve_order", "float_roundtrip"] }
 sha2 = { version = "=0.11.1", default-features = false }
