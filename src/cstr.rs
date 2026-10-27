@@ -8,9 +8,9 @@ use primase_foundations::compress::{Decompressor, Deflate};
 /// Decoded bytes and block counts (including stored blocks).
 #[derive(Debug)]
 pub struct Decoded {
-    /// The decoded stream.
+    /// The decoded stream: every block's payload, concatenated, exactly the entry's expected size.
     pub bytes: Vec<u8>,
-    /// Number of blocks in the stream.
+    /// Number of blocks in the stream, as the CSTR header counts them (stored blocks included).
     pub blocks: usize,
     /// How many of those blocks are stored rather than DEFLATE-compressed.
     pub stored_blocks: usize,

@@ -18,7 +18,7 @@ pub struct SessionIdentifier {
 pub struct SessionRow {
     /// The row's SQLite rowid.
     pub rowid: i64,
-    /// The row's `id` column.
+    /// The row's `id` column, parsed as an integer.
     pub id: u32,
     /// MAIN.DB stores these columns as TEXT. SQL NULL remains distinct from an empty string.
     pub fields: BTreeMap<String, Option<String>>,

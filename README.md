@@ -19,23 +19,24 @@ nothing rendered, nothing written back.
 
 ## Example
 
-Open an archive from your own disc and decode every level mesh in it. The same code is compiled by the crate's doc test
-and runs as `cargo run --example list_quartets -- <archive.pak>`.
+Open an archive from your own disc and decode every level mesh in it. The crate documentation compiles the same code as a doc test (it is not run, since it needs game files), and `examples/list_quartets.rs` is a runnable version that takes the archive path: `cargo run --example list_quartets -- <archive.pak>`.
 
 ```rust
 use rme_formats::{pak::Pak, scene};
 
-let pak = Pak::open("PS3_GAME/USRDIR/LEVELS/CHARLIE.PAK")?;
-for (stem, entries) in scene::quartets(&pak)? {
-    let scene = scene::decode_quartet(&pak, entries)?;
-    println!(
-        "{}: {} models, {} placements",
-        String::from_utf8_lossy(&stem),
-        scene.models.len(),
-        scene.placements.len()
-    );
+fn main() -> Result<(), rme_formats::Error> {
+    let pak = Pak::open("PS3_GAME/USRDIR/LEVELS/CHARLIE.PAK")?;
+    for (stem, entries) in scene::quartets(&pak)? {
+        let scene = scene::decode_quartet(&pak, entries)?;
+        println!(
+            "{}: {} models, {} placements",
+            String::from_utf8_lossy(&stem),
+            scene.models.len(),
+            scene.placements.len()
+        );
+    }
+    Ok(())
 }
-# Ok::<(), rme_formats::Error>(())
 ```
 
 ## What it guarantees
@@ -45,9 +46,9 @@ for (stem, entries) in scene::quartets(&pak)? {
   was expected. The tests check this on hand-damaged fixtures; the crate has not been fuzzed.
 - Fields whose role is unproven are kept as stored (opaque words, unknown tables listed with their byte spans), not
   guessed. Names keep their original bytes, case and separators.
-- Decoded values are not repaired: a non-finite matrix element, a position outside its stored bounds, an index out of
-  range or a non-unit normal is refused (or, for a mesh variant the library does not support, that mesh is marked
-  refused while its siblings decode).
+- Decoded values are not repaired. A non-finite matrix element, a position outside its stored bounds, an index out of
+  range or a non-unit RSX CMP normal is refused; zero normals and the NaN normals of some skin vertices are kept as
+  stored. A mesh variant the library does not support is marked refused while the other models of the file decode.
 - Matrices are `Affine` (3x4, column by column) in the game's native frame: left-handed, Y up. Converting frames is the
   caller's.
 - Only `Pak::open` touches the file system; everything else takes bytes. `unsafe` code is denied.
@@ -92,8 +93,8 @@ program made with RPCS3's Cg decoder; without them the tests that compare agains
 
 See [CONTRIBUTING.md](CONTRIBUTING.md), which also says how to report a file the library cannot read.
 
-Used by [primase](https://github.com/Kalmarv/primase), a game-asset conversion library.
-
 ## License
 
 GPL-3.0-or-later; see [LICENSE](LICENSE).
+
+Used by [primase](https://github.com/Kalmarv/primase), a game-asset conversion library.

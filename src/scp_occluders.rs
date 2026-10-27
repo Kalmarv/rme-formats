@@ -35,15 +35,15 @@ fn segments(flags: u32) -> Option<usize> {
 #[derive(Clone, Debug, PartialEq)]
 /// An occluder: a world matrix and the line segments of its outline.
 pub struct Occluder {
-    /// Offset of the section holding it.
+    /// Offset in the SCP file of the section holding it ([`Section::offset`]).
     pub section: usize,
-    /// Its index in the section.
+    /// Its 0-based index among the section's records.
     pub index: u32,
-    /// Word 0.
+    /// Word 0: the occluder's name hash, as stored.
     pub name: u32,
     /// Word 3 as stored: the low half is the shape ([`SHAPE_RECTANGLE`], [`SHAPE_BOX`]), the high half unknown.
     pub flags: u32,
-    /// The record's matrix.
+    /// The world matrix the record points at.
     pub world: Affine,
     /// The outline's segments, each as its two end points (x, y, z), as stored.
     pub outline: Vec<[[f32; 3]; 2]>,

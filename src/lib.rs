@@ -1,5 +1,7 @@
 //! Readers for the game data of Tony Hawk's SHRED (PS3, 2010), which runs on Robomodo's RME engine.
 //!
+//! It is written against the files of the PS3 disc (the `PS3_GAME/USRDIR` folder; 32-bit big-endian pointers).
+//!
 //! Bytes in, plain records out: archives, level meshes, materials, textures, the game's SQLite database, a level's
 //! Lua parameter script and animation reference rigs. Nothing here loads a game, renders a scene or decides what a
 //! record means beyond what the files state; a field whose role is not known is kept as stored. Every length, count
@@ -89,7 +91,7 @@ pub mod texture;
 /// Why a read was refused.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    /// Reading the file failed.
+    /// Reading the file from disk failed (only [`pak::Pak::open`] touches the file system).
     #[error("I/O: {0}")]
     Io(#[from] std::io::Error),
     /// A named field lies outside the bytes being read; the message gives its offset.
@@ -127,7 +129,7 @@ pub struct Affine {
 }
 
 impl Affine {
-    /// The transform that changes nothing.
+    /// The transform that changes nothing: identity linear part, zero translation.
     pub const IDENTITY: Affine = Affine {
         cols: [[1., 0., 0.], [0., 1., 0.], [0., 0., 1.], [0., 0., 0.]],
     };

@@ -34,7 +34,7 @@ pub enum SplineKind {
     ShortPath,
 }
 impl SplineKind {
-    /// Every class, in class order.
+    /// Every spline class, in class-index order.
     pub const ALL: [Self; 5] = [
         Self::RailCandidate,
         Self::Guide,
@@ -56,7 +56,7 @@ impl SplineKind {
         }
     }
 
-    /// The game's spline class index.
+    /// The game's spline class index (0 to 4) of this kind.
     pub fn class(self) -> usize {
         match self {
             Self::RailCandidate => 0,
@@ -80,19 +80,19 @@ impl SplineKind {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-/// One spline record as authored.
+/// One spline record as authored (56 bytes) with the points and parameters its pointers lead to.
 pub struct Spline {
-    /// Offset of the section holding it, its flags and its index in the section.
+    /// Offset in the SCP file of the section holding it ([`Section::offset`]).
     pub section: usize,
-    /// The section's flags.
+    /// The flags of the section holding it.
     pub flags: u32,
-    /// Its index in the section.
+    /// Its 0-based index among the section's records.
     pub index: u32,
     /// The spline class the section type names.
     pub kind: SplineKind,
-    /// sdbm of the spline's name.
+    /// Word 0: the sdbm hash of the spline's name.
     pub id: u32,
-    /// Word 1: the parent group's id.
+    /// Word 1: the id of the parent group.
     pub parent: u32,
     /// Words 5 and 6: the point count and a second count that is equal except in a few records.
     pub counts: [u32; 2],
@@ -103,7 +103,7 @@ pub struct Spline {
     pub surface: u32,
     /// The 64-byte matrix word 10 points at: unproven (a spline-local frame; the points are already in level space).
     pub matrix: [f32; 16],
-    /// World-space points, level space, as stored.
+    /// The spline's points (word 11), in level space, as stored.
     pub points: Vec<[f32; 3]>,
     /// Per-point values that increase from zero, as stored. Not arc length.
     pub params: Vec<f32>,

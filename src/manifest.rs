@@ -19,11 +19,11 @@ use crate::{pak::Pak, scene};
 pub enum Difficulty {
     /// Nibble `0`: the level's base archive.
     Base,
-    /// Nibble `8`.
+    /// Nibble `8`: the Casual difficulty layer.
     Casual,
-    /// Nibble `9`.
+    /// Nibble `9`: the Confident difficulty layer.
     Confident,
-    /// Nibble `A`.
+    /// Nibble `A`: the Hardcore difficulty layer.
     Hardcore,
 }
 impl Difficulty {

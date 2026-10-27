@@ -57,13 +57,13 @@ impl From<SqliteValue> for Value {
 /// One row: its rowid and one value per declared column (an `INTEGER PRIMARY KEY` column holds the rowid).
 #[derive(Debug, Clone, PartialEq)]
 pub struct Row {
-    /// The row id.
+    /// The row's rowid; for an `INTEGER PRIMARY KEY` column this is also that column's value.
     pub rowid: i64,
-    /// One value per declared column.
+    /// One value per declared column, in column order.
     pub values: Vec<Value>,
 }
 
-/// A table read whole.
+/// A table read whole: every row of its b-tree, in stored order.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Table {
     /// The table's name as the database stores it.

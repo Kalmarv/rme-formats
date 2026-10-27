@@ -173,7 +173,7 @@ impl<'a> MaterialLibrary<'a> {
         }
     }
 
-    /// The material with `key`.
+    /// The material with `key` (bank and id), or `None` when the supplied banks hold none.
     pub fn material(&self, key: &MaterialKey) -> Option<&ShredMaterial> {
         self.materials.get(&key.id)?.iter().find(|m| &m.key == key)
     }
@@ -188,7 +188,7 @@ impl<'a> MaterialLibrary<'a> {
         self.classes.get(stem)
     }
 
-    /// The textures of the supplied archives.
+    /// The catalog of the texture headers and pixel copies of the supplied archives.
     pub fn textures(&self) -> &TextureCatalog<'a> {
         &self.textures
     }

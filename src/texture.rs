@@ -8,10 +8,10 @@ use thiserror::Error;
 /// Why a texture header or copy was refused.
 pub enum Error {
     #[error(transparent)]
-    /// The archive could not be read.
+    /// The archive holding the texture could not be read.
     Archive(#[from] crate::Error),
     #[error("texture header at {offset:#x}: {detail}")]
-    /// The 84-byte header is not one.
+    /// The 84-byte texture header does not hold what the format requires.
     Header {
         /// Offset in the header.
         offset: usize,
@@ -19,7 +19,7 @@ pub enum Error {
         detail: &'static str,
     },
     #[error(transparent)]
-    /// The GCM texture descriptor was refused.
+    /// The GCM texture descriptor inside the header was refused.
     Gcm(#[from] rsx_reader::gcm::Error),
     #[error("texture {texture}: {detail}")]
     /// A texture record or one of its pixel copies is missing or ambiguous.

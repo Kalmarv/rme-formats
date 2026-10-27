@@ -16,9 +16,9 @@ const MATRIX: usize = 64;
 #[derive(Clone, Debug, PartialEq)]
 /// A locator record: a class, a name and a kind under one world matrix.
 pub struct Locator {
-    /// Offset of the section holding it.
+    /// Offset in the SCP file of the section holding it ([`Section::offset`]).
     pub section: usize,
-    /// Its index in the section.
+    /// Its 0-based index among the section's records.
     pub index: u32,
     /// Word 0: the class hash.
     pub class: u32,
@@ -26,7 +26,7 @@ pub struct Locator {
     pub name: u32,
     /// Word 2: the kind hash.
     pub kind: u32,
-    /// The matrix word 3 points at.
+    /// The world matrix word 3 points at (an offset from the section start).
     pub world: Affine,
 }
 

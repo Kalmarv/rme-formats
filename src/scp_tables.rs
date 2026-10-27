@@ -46,9 +46,9 @@ pub struct Node {
     /// Words `+0x00..+0x0F` as floats when any is non-zero: centre and radius of a bounding sphere. Unproven: the
     /// centre lies 0.57 to 73 from the node's translation in one checked file.
     pub sphere: Option<[f32; 4]>,
-    /// Indices into the node table.
+    /// Indices into the node table of the node's children.
     pub children: Vec<u32>,
-    /// Indices into the placement table.
+    /// Indices into the placement table of the placements under the node.
     pub placements: Vec<u32>,
 }
 
@@ -59,15 +59,15 @@ pub struct Section {
     pub offset: usize,
     /// The header's flags; the type is `flags >> 16`.
     pub flags: u32,
-    /// Size of the section, header included.
+    /// Size of the section in bytes, header included.
     pub size: usize,
-    /// The record count.
+    /// The number of records the section holds.
     pub count: u32,
     /// Offset of the section's data from its start.
     pub data: usize,
 }
 impl Section {
-    /// `flags >> 16`.
+    /// The section type, `flags >> 16`.
     pub fn kind(&self) -> u32 {
         self.flags >> 16
     }
@@ -91,9 +91,9 @@ pub enum Chain {
 /// A spot chunk: a `0x200`-byte record and its own 64-byte world matrix.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SpotChunk {
-    /// Offset of the section holding it, and its index in the section.
+    /// Offset in the SCP file of the section holding it ([`Section::offset`]).
     pub section: usize,
-    /// Its index in the section.
+    /// Its 0-based index among the section's records.
     pub index: u32,
     /// `+0x10`: hash of the chunk's name (a DB spot name, lower-cased or as written).
     pub name: u32,
@@ -109,22 +109,22 @@ pub struct SpotChunk {
     pub pair: [u32; 2],
     /// The node whose `id` equals `id`, when there is one.
     pub node: Option<u32>,
-    /// The chunk's own world matrix.
+    /// The chunk's own 64-byte world matrix.
     pub world: Affine,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
 /// What `decode` read from one SCP.
 pub struct Tables {
-    /// The node table.
+    /// The node table, one entry per node of the SCP.
     pub nodes: Vec<Node>,
     /// Every blob section, whether or not it is decoded.
     pub sections: Vec<Section>,
-    /// How the section chain ended.
+    /// How the section chain ended: whether it reached the end record exactly at the end of the file.
     pub chain: Chain,
     /// The spot chunks of the type 2 sections.
     pub spots: Vec<SpotChunk>,
-    /// The splines of the spline sections.
+    /// The splines of the spline sections, in section order.
     pub splines: Vec<Spline>,
     /// The lights of the type 4 sections.
     pub lights: Vec<SceneLight>,

@@ -29,11 +29,11 @@ pub struct Entry {
     pub section: Option<usize>,
     /// `0` stored, `1` section marker, `2` CSTR-compressed.
     pub attributes: u32,
-    /// Runtime allocation alignment, not file-offset alignment.
+    /// Runtime allocation alignment in bytes as the table stores it; it is not a file-offset alignment.
     pub alignment: u32,
     /// Offset of the stored payload in the archive file.
     pub offset: usize,
-    /// Size of the decoded payload.
+    /// Size of the decoded payload in bytes.
     pub size: usize,
     /// Zero for stored entries and markers; otherwise the encoded CSTR length.
     pub compressed_size: usize,
@@ -44,7 +44,7 @@ pub struct Entry {
 pub struct Section {
     /// The name as stored, case and separators included.
     pub name: Vec<u8>,
-    /// Includes this section's marker entry.
+    /// Indices into [`Pak::entries`] of the section's entries, the opening marker entry included.
     pub entries: Range<usize>,
 }
 

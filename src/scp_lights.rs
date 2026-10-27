@@ -18,22 +18,22 @@ const MATRIX: usize = 64;
 #[derive(Clone, Debug, PartialEq)]
 /// A light record as authored; what it means to a renderer is not established.
 pub struct SceneLight {
-    /// Offset of the section holding it.
+    /// Offset in the SCP file of the section holding it ([`Section::offset`]).
     pub section: usize,
-    /// Its index in the section.
+    /// Its 0-based index among the section's records.
     pub index: u32,
     /// Word 8, by count in the level SCPs: 0 (5,251), 7 (4,079), 8 (398), 1 (23, named `Sun` where the name
     /// resolves), 4 (23), 3 (4, with a texture name in the buffer: `gobo_star`, `gobo_circle`). Not a proven vocabulary.
     pub kind: u32,
-    /// Red, green, blue, alpha as stored.
+    /// Words 0 to 3: red, green, blue and alpha as f32, as stored.
     pub rgba: [f32; 4],
-    /// Word 4.
+    /// Word 4: the light's name hash, as stored.
     pub name: u32,
     /// Words 5 to 7 as stored (kind 0: 0.2 to 11, 1 to 15 and 0.2 to 2.2; kinds 1 and 4: 1, 100 and 0.4 to 1).
     pub params: [f32; 3],
-    /// Words 9 to 12 and 14, 15.
+    /// Words 9 to 12, as stored (-1, 0, 0, -1 or -2 in the lights seen).
     pub links: [u32; 4],
-    /// Words 14 and 15.
+    /// Words 14 and 15, as stored (0 except for one kind).
     pub tail_words: [u32; 2],
     /// Words 16 to 19: leftover bytes of the editor's name buffer, kept raw.
     pub buffer: [u8; 16],

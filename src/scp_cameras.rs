@@ -20,19 +20,19 @@ const MATRIX: usize = 64;
 #[derive(Clone, Debug, PartialEq)]
 /// A spot camera record: two frames placed under a spot name.
 pub struct SpotCamera {
-    /// Offset of the section holding it.
+    /// Offset in the SCP file of the section holding it ([`Section::offset`]).
     pub section: usize,
-    /// Its index in the section.
+    /// Its 0-based index among the section's records.
     pub index: u32,
-    /// Word 0.
+    /// Word 0: the record's own id, as stored.
     pub id: u32,
     /// Word 2: sdbm of a spot name as written.
     pub name: u32,
-    /// Word 4.
+    /// Word 4: the parent id.
     pub parent: u32,
-    /// Word 5 as stored.
+    /// Word 5, an f32 as stored (53.638 in every record seen).
     pub value: f32,
-    /// Word 6.
+    /// Word 6, a flag word as stored (1 in every record seen).
     pub flag: u32,
     /// The first matrix (word 7): the frame the record places, which the second looks along. Unproven reading.
     pub camera: Affine,

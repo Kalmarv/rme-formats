@@ -19,7 +19,7 @@ pub enum ScriptValue {
     Bool(bool),
     /// A number constant.
     Number(f64),
-    /// A string constant.
+    /// A string constant, as text; the script's bytes up to the terminator.
     Text(String),
 }
 
@@ -69,7 +69,7 @@ pub struct ParamsReport {
     pub level: String,
     /// The script's name when the archive has one.
     pub script: Option<String>,
-    /// How many calls were read.
+    /// How many calls were read into the result.
     pub read: usize,
     /// Calls not read, each with the instruction it is at and why.
     pub unread: Vec<(usize, String)>,

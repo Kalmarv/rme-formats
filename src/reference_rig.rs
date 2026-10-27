@@ -37,7 +37,7 @@ pub struct UninterpretedAsset {
 /// Counts over the bundles read.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Report {
-    /// Bundles added.
+    /// Bundles added to the report.
     pub bundles: usize,
     /// Bundles that held no reference rig.
     pub bundles_without_rigs: usize,
@@ -47,7 +47,7 @@ pub struct Report {
     pub rigs: usize,
     /// Joints over all rigs.
     pub joints: usize,
-    /// Bytes of record padding.
+    /// Bytes of record padding over all bundles.
     pub padding_bytes: usize,
     /// The records that are not type 1 reference rigs.
     pub uninterpreted_assets: Vec<UninterpretedAsset>,
@@ -57,7 +57,7 @@ pub struct Report {
 }
 
 impl Report {
-    /// Count one more bundle.
+    /// Adds one bundle's counts and uninterpreted records to the report.
     pub fn add(&mut self, bundle: &Bundle) {
         self.bundles = self.bundles.saturating_add(1);
         self.bundles_without_rigs = self
