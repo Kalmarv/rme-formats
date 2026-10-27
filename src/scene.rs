@@ -319,8 +319,16 @@ pub fn decode(scp: &[u8], mlp: &[u8], mmp: &[u8], mgp: &[u8]) -> Result<Scene> {
         let io = b.u(offset(ip, 8)?)?;
         let size = b.u(offset(ip, 12)?)?;
         b.require(offset(ip, 4)?, b.u(offset(ip, 4)?)? == 5, "unsupported topology")?;
-        b.require(offset(ip, 16)?, b.u(offset(ip, 16)?)? == 1, "unsupported index type")?;
-        b.require(offset(ip, 12)?, ic.checked_mul(2) == Some(size), "index size mismatch")?;
+        b.require(
+            offset(ip, 16)?,
+            b.u(offset(ip, 16)?)? == 1,
+            "unsupported index type",
+        )?;
+        b.require(
+            offset(ip, 12)?,
+            ic.checked_mul(2) == Some(size),
+            "index size mismatch",
+        )?;
         b.require(ip, ic.is_multiple_of(3), "index count is not a triangle list")?;
         let ib = cpu.slice(io, size)?;
         let indices: Vec<u32> = ib
@@ -346,7 +354,11 @@ pub fn decode(scp: &[u8], mlp: &[u8], mmp: &[u8], mgp: &[u8]) -> Result<Scene> {
                     && n.is_multiple_of(3),
                 "invalid submesh index span",
             )?;
-            b.require(offset(p, 40)?, b.u(offset(p, 40)?)? == 0, "unsupported base vertex")?;
+            b.require(
+                offset(p, 40)?,
+                b.u(offset(p, 40)?)? == 0,
+                "unsupported base vertex",
+            )?;
             let span = first..offset(first, n)?;
             partition.push(span.clone());
             let remap_at = offset(p, 56)?;
@@ -510,7 +522,11 @@ pub fn decode(scp: &[u8], mlp: &[u8], mmp: &[u8], mgp: &[u8]) -> Result<Scene> {
     for i in 0..n {
         let record = element(off, i, 48, 0)?;
         let id = s.w(offset(record, 8)?)?;
-        s.require(offset(record, 8)?, ids.contains(&id), "placement references missing mesh")?;
+        s.require(
+            offset(record, 8)?,
+            ids.contains(&id),
+            "placement references missing mesh",
+        )?;
         let mut words = [0u32; 12];
         for (j, word) in words.iter_mut().enumerate() {
             *word = s.w(element(record, j, 4, 0)?)?;

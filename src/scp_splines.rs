@@ -9,9 +9,9 @@
 //! integers, `9` surface id, `10` pointer to a 64-byte matrix, `11` pointer to `count` world-space points (3 x f32),
 //! `12` pointer to `count` f32 that increase from 0 (not arc length), `13` unread.
 use crate::scene::Unread;
-use crate::scp_tables::Section;
-use crate::{Result, invalid};
-use primase_foundations::bytes::{Endian, Field, View};
+use crate::scp_tables::{Section, finite, word};
+use crate::{Result, element, invalid, offset};
+use primase_foundations::bytes::View;
 
 const RECORD: usize = 56;
 
@@ -107,8 +107,8 @@ pub struct Spline {
 /// Read every record of one spline section; a section that does not fit is reported unread and gives no splines.
 pub fn decode(scp: &[u8], s: &Section, kind: SplineKind, unread: &mut Vec<Unread>) -> Result<Vec<Spline>> {
     let v = View::new(scp);
-    let end = s.offset + s.size;
-    let region = s.offset + s.data;
+    let end = offset(s.offset, s.size)?;
+    let region = offset(s.offset, s.data)?;
     let n = s.count as usize;
     let bad = |reason: &'static str, unread: &mut Vec<Unread>| {
         unread.push(Unread {
@@ -126,11 +126,15 @@ pub fn decode(scp: &[u8], s: &Section, kind: SplineKind, unread: &mut Vec<Unread
         return bad("spline section whose records do not fit its size", unread);
     }
     let mut out = Vec::with_capacity(n);
-    for i in 0..n {
-        let at = region + i * RECORD;
-        let word = |k: usize| v.u32(at + 4 * k, Endian::Big).field("spline record");
-        let count = word(5)? as usize;
-        let (pa, pb, pc) = (word(10)? as usize, word(11)? as usize, word(12)? as usize);
+    for index in 0..s.count {
+        let at = element(region, index as usize, RECORD, 0)?;
+        let record_word = |k: usize| word(v, element(at, k, 4, 0)?, "spline record");
+        let count = record_word(5)? as usize;
+        let (pa, pb, pc) = (
+            record_word(10)? as usize,
+            record_word(11)? as usize,
+            record_word(12)? as usize,
+        );
         let inside = |p: usize, len: usize| {
             p.checked_add(len)
                 .and_then(|e| s.offset.checked_add(e))
@@ -142,35 +146,30 @@ pub fn decode(scp: &[u8], s: &Section, kind: SplineKind, unread: &mut Vec<Unread
         {
             return Err(invalid(at, "scp: spline arrays outside their section"));
         }
-        let f = |at: usize| -> Result<f32> {
-            let x = v.f32(at, Endian::Big).field("spline data")?;
-            if x.is_finite() {
-                Ok(x)
-            } else {
-                Err(invalid(at, "scp: nonfinite spline value"))
-            }
-        };
+        let f = |at: usize| finite(v, at, "spline data", "scp: nonfinite spline value");
         let mut matrix = [0.; 16];
+        let matrix_at = offset(s.offset, pa)?;
         for (k, m) in matrix.iter_mut().enumerate() {
-            *m = f(s.offset + pa + 4 * k)?;
+            *m = f(element(matrix_at, k, 4, 0)?)?;
         }
+        let (points_at, params_at) = (offset(s.offset, pb)?, offset(s.offset, pc)?);
         let mut points = Vec::with_capacity(count);
         let mut params = Vec::with_capacity(count);
         for k in 0..count {
-            let p = s.offset + pb + 12 * k;
-            points.push([f(p)?, f(p + 4)?, f(p + 8)?]);
-            params.push(f(s.offset + pc + 4 * k)?);
+            let p = element(points_at, k, 12, 0)?;
+            points.push([f(p)?, f(offset(p, 4)?)?, f(offset(p, 8)?)?]);
+            params.push(f(element(params_at, k, 4, 0)?)?);
         }
         out.push(Spline {
             section: s.offset,
             flags: s.flags,
-            index: i as u32,
+            index,
             kind,
-            id: word(0)?,
-            parent: word(1)?,
-            counts: [word(5)?, word(6)?],
-            words: [word(7)?, word(8)?],
-            surface: word(9)?,
+            id: record_word(0)?,
+            parent: record_word(1)?,
+            counts: [record_word(5)?, record_word(6)?],
+            words: [record_word(7)?, record_word(8)?],
+            surface: record_word(9)?,
             matrix,
             points,
             params,

@@ -11,9 +11,9 @@
 //! the data, not from the engine.
 use crate::Affine;
 use crate::scene::Unread;
-use crate::scp_tables::{Section, matrix};
-use crate::{Result, invalid};
-use primase_foundations::bytes::{Endian, Field, View};
+use crate::scp_tables::{Section, finite, float, matrix, word};
+use crate::{Result, element, invalid, offset};
+use primase_foundations::bytes::View;
 
 const RECORD: usize = 16;
 const MATRIX: usize = 64;
@@ -67,46 +67,53 @@ pub fn decode(scp: &[u8], s: &Section, unread: &mut Vec<Unread>) -> Result<Vec<O
     };
     let mut next = records;
     let mut out = Vec::with_capacity(n);
-    for i in 0..n {
-        let at = s.offset + s.data + i * RECORD;
-        let word = |k: usize| v.u32(at + 4 * k, Endian::Big).field("occluder record");
-        let Some(edges) = segments(word(3)?) else {
+    let first = offset(s.offset, s.data)?;
+    for index in 0..s.count {
+        let at = element(first, index as usize, RECORD, 0)?;
+        let record_word = |k: usize| word(v, element(at, k, 4, 0)?, "occluder record");
+        let Some(edges) = segments(record_word(3)?) else {
             return refuse("occluder section with an outline shape not decoded");
         };
-        let len = MATRIX + edges * SEGMENT;
-        if word(1)? as usize != next || word(2)? as usize != next + MATRIX || next + len > s.size {
+        let len = element(MATRIX, edges, SEGMENT, 0)?;
+        let outline_at = offset(next, MATRIX)?;
+        if record_word(1)? as usize != next
+            || record_word(2)? as usize != outline_at
+            || offset(next, len)? > s.size
+        {
             return Err(invalid(
-                at + 4,
+                offset(at, 4)?,
                 "scp: occluder matrix and outline off their place",
             ));
         }
-        let (m, o) = (s.offset + next, s.offset + next + MATRIX);
+        let (m, o) = (offset(s.offset, next)?, offset(s.offset, outline_at)?);
         let mut outline = Vec::with_capacity(edges);
         for e in 0..edges {
             let mut seg = [[0.; 3]; 2];
             for (end, p) in seg.iter_mut().enumerate() {
-                let q = o + e * SEGMENT + end * 16;
+                let q = offset(element(o, e, SEGMENT, 0)?, element(0, end, 16, 0)?)?;
                 for (k, x) in p.iter_mut().enumerate() {
-                    *x = v.f32(q + 4 * k, Endian::Big).field("occluder outline")?;
-                    if !x.is_finite() {
-                        return Err(invalid(q + 4 * k, "scp: nonfinite occluder outline"));
-                    }
+                    *x = finite(
+                        v,
+                        element(q, k, 4, 0)?,
+                        "occluder outline",
+                        "scp: nonfinite occluder outline",
+                    )?;
                 }
-                if v.f32(q + 12, Endian::Big).field("occluder outline")? != 1. {
-                    return Err(invalid(q + 12, "scp: occluder outline w is not 1"));
+                if float(v, offset(q, 12)?, "occluder outline")? != 1. {
+                    return Err(invalid(offset(q, 12)?, "scp: occluder outline w is not 1"));
                 }
             }
             outline.push(seg);
         }
         out.push(Occluder {
             section: s.offset,
-            index: i as u32,
-            name: word(0)?,
-            flags: word(3)?,
+            index,
+            name: record_word(0)?,
+            flags: record_word(3)?,
             world: matrix(v, m)?,
             outline,
         });
-        next += len;
+        next = offset(next, len)?;
     }
     if next != s.size {
         return refuse("occluder section whose matrices and outlines do not tile it");

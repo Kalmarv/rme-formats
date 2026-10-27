@@ -19,7 +19,7 @@ use crate::scp_lights::{self, SceneLight};
 use crate::scp_locators::{self, Locator};
 use crate::scp_occluders::{self, Occluder};
 use crate::scp_splines::{self, Spline, SplineKind};
-use crate::{Result, invalid};
+use crate::{Result, element, invalid, offset};
 use primase_foundations::bytes::{Endian, Field, View};
 
 /// A node's links are `0x70`-byte records.
@@ -147,18 +147,43 @@ pub fn shape_name(hash: u32) -> Option<&'static str> {
         .find(|n| primase_foundations::hash::sdbm(n.as_bytes()) == hash)
 }
 
+/// The big-endian word at `at`, refused with the field's name outside the file.
+pub(crate) fn word(v: View<'_>, at: usize, what: &'static str) -> Result<u32> {
+    Ok(v.u32(at, Endian::Big).field(what)?)
+}
+
+/// The big-endian float at `at`, refused with the field's name outside the file.
+pub(crate) fn float(v: View<'_>, at: usize, what: &'static str) -> Result<f32> {
+    Ok(v.f32(at, Endian::Big).field(what)?)
+}
+
+/// A float that must be finite.
+pub(crate) fn finite(v: View<'_>, at: usize, what: &'static str, detail: &'static str) -> Result<f32> {
+    let x = float(v, at, what)?;
+    if x.is_finite() {
+        Ok(x)
+    } else {
+        Err(invalid(at, detail))
+    }
+}
+
+/// A 3x4 affine matrix at `at`: four columns of three finite floats, each followed by its w (0, and 1 for the
+/// translation).
 pub(crate) fn matrix(v: View<'_>, at: usize) -> Result<Affine> {
     let mut cols = [[0.; 3]; 4];
     for (j, col) in cols.iter_mut().enumerate() {
+        let col_at = element(at, j, 16, 0)?;
         for (k, x) in col.iter_mut().enumerate() {
-            *x = v.f32(at + j * 16 + k * 4, Endian::Big).field("matrix")?;
-            if !x.is_finite() {
-                return Err(invalid(at + j * 16 + k * 4, "scp: nonfinite matrix element"));
-            }
+            *x = finite(
+                v,
+                element(col_at, k, 4, 0)?,
+                "matrix",
+                "scp: nonfinite matrix element",
+            )?;
         }
-        let w = v.f32(at + j * 16 + 12, Endian::Big).field("matrix")?;
-        if w != if j == 3 { 1. } else { 0. } {
-            return Err(invalid(at + j * 16 + 12, "scp: nonaffine matrix"));
+        let w_at = offset(col_at, 12)?;
+        if float(v, w_at, "matrix")? != if j == 3 { 1. } else { 0. } {
+            return Err(invalid(w_at, "scp: nonaffine matrix"));
         }
     }
     Ok(Affine { cols })
@@ -174,7 +199,7 @@ fn table(total: usize, count: usize, at: usize, stride: usize, what: &str) -> Re
 /// chain; every other section is returned in `sections` and its `Unread` entry is in the second result.
 pub fn decode(scp: &[u8]) -> Result<(Tables, Vec<Unread>)> {
     let v = View::new(scp);
-    let u = |at: usize| -> Result<usize> { Ok(v.u32(at, Endian::Big).field("scp header")? as usize) };
+    let u = |at: usize| -> Result<usize> { Ok(word(v, at, "scp header")? as usize) };
     let (n_place, o_place) = (u(0x10)?, u(0x14)?);
     let (n_node, o_node) = (u(0x18)?, u(0x1c)?);
     let (n_xf, o_xf) = (u(0x38)?, u(0x3c)?);
@@ -197,36 +222,42 @@ pub fn decode(scp: &[u8]) -> Result<(Tables, Vec<Unread>)> {
         }
     }
     let link = |ptr: usize, base: usize, stride: usize, count: usize, what: &str| -> Result<u32> {
-        let rel = ptr
-            .checked_sub(base)
-            .filter(|r| r % stride == 0 && r / stride < count);
-        rel.map(|r| (r / stride) as u32)
+        ptr.checked_sub(base)
+            .filter(|r| r.checked_rem(stride) == Some(0))
+            .and_then(|r| r.checked_div(stride))
+            .filter(|&index| index < count)
+            .and_then(|index| u32::try_from(index).ok())
             .ok_or_else(|| invalid(ptr, format!("scp: {what} link {ptr:#x} is not a record start")))
     };
     for i in 0..n_node {
-        let at = o_node + i * NODE;
-        let word = |k: usize| u(at + 4 * k);
-        let (hash, matrix_at) = (u(o_xf + 8 * i)? as u32, u(o_xf + 8 * i + 4)?);
+        let at = element(o_node, i, NODE, 0)?;
+        let node_word = |k: usize| -> Result<usize> { u(element(at, k, 4, 0)?) };
+        let hash = word(v, element(o_xf, i, 8, 0)?, "world matrix hash")?;
+        let matrix_at = u(element(o_xf, i, 8, 4)?)?;
         let mut lists = [(); 2].map(|()| Vec::new());
-        for (set, (counts, arrays)) in [(8, 13), (18, 23)].into_iter().enumerate() {
+        for (set, (list, (counts, arrays))) in lists.iter_mut().zip([(8, 13), (18, 23)]).enumerate() {
             for k in 0..5 {
-                let (count, array) = (word(counts + k)?, word(arrays + k)?);
+                let (count_k, array_k) = (offset(counts, k)?, offset(arrays, k)?);
+                let (count, array) = (node_word(count_k)?, node_word(array_k)?);
                 if count == 0 {
                     continue;
                 }
                 if k != 0 {
-                    return Err(invalid(at + 4 * (counts + k), "scp: node link kind other than 0"));
+                    return Err(invalid(
+                        element(at, count_k, 4, 0)?,
+                        "scp: node link kind other than 0",
+                    ));
                 }
                 if array == u32::MAX as usize {
                     return Err(invalid(
-                        at + 4 * (arrays + k),
+                        element(at, array_k, 4, 0)?,
                         "scp: node links counted but no array",
                     ));
                 }
                 table(scp.len(), count, array, 4, "node link")?;
                 for j in 0..count {
-                    let ptr = u(array + 4 * j)?;
-                    lists[set].push(if set == 0 {
+                    let ptr = u(element(array, j, 4, 0)?)?;
+                    list.push(if set == 0 {
                         link(ptr, o_node, NODE, n_node, "child")?
                     } else {
                         link(ptr, o_place, PLACEMENT, n_place, "placement")?
@@ -235,20 +266,22 @@ pub fn decode(scp: &[u8]) -> Result<(Tables, Vec<Unread>)> {
             }
         }
         let [children, placements] = lists;
-        let sphere = if (0..4).all(|k| word(k).is_ok_and(|w| w == 0)) {
+        let sphere = if (0..4).all(|k| node_word(k).is_ok_and(|w| w == 0)) {
             None
         } else {
             let mut s = [0.; 4];
             for (k, x) in s.iter_mut().enumerate() {
-                *x = v.f32(at + 4 * k, Endian::Big).field("node sphere")?;
-                if !x.is_finite() {
-                    return Err(invalid(at + 4 * k, "scp: nonfinite node sphere"));
-                }
+                *x = finite(
+                    v,
+                    element(at, k, 4, 0)?,
+                    "node sphere",
+                    "scp: nonfinite node sphere",
+                )?;
             }
             Some(s)
         };
         tables.nodes.push(Node {
-            id: word(4)? as u32,
+            id: word(v, element(at, 4, 4, 0)?, "node id")?,
             matrix_hash: hash,
             world: matrix(v, matrix_at)?,
             sphere,
@@ -256,13 +289,11 @@ pub fn decode(scp: &[u8]) -> Result<(Tables, Vec<Unread>)> {
             placements,
         });
     }
-    let by_id: std::collections::BTreeMap<u32, u32> = {
-        let mut m = std::collections::BTreeMap::new();
-        for (i, n) in tables.nodes.iter().enumerate() {
-            m.entry(n.id).or_insert(i as u32);
-        }
-        m
-    };
+    let mut by_id = std::collections::BTreeMap::<u32, u32>::new();
+    for (i, n) in tables.nodes.iter().enumerate() {
+        let index = u32::try_from(i).map_err(|_| invalid(o_node, "scp: node index outside u32"))?;
+        by_id.entry(n.id).or_insert(index);
+    }
     if blob == 0 || blob == u32::MAX as usize {
         tables.chain = Chain::None;
         return Ok((tables, unread));
@@ -278,20 +309,27 @@ pub fn decode(scp: &[u8]) -> Result<(Tables, Vec<Unread>)> {
     }
     let mut o = blob;
     let chain = loop {
-        if o + 16 == scp.len() {
-            let tail = |k: usize| v.u32(o + 4 * k, Endian::Big).field("chain end");
+        if offset(o, 16)? == scp.len() {
+            let tail = |k: usize| word(v, element(o, k, 4, 0)?, "chain end");
             break if (tail(1)?, tail(2)?, tail(3)?) == (8, 0, 0) {
                 Chain::Complete
             } else {
                 Chain::Stopped { offset: o }
             };
         }
-        let head = |k: usize| v.u32(o + 4 * k, Endian::Big).ok();
+        let head = |k: usize| {
+            element(o, k, 4, 0)
+                .and_then(|at| word(v, at, "section header"))
+                .ok()
+        };
         let (Some(flags), Some(size), Some(count), Some(data)) = (head(0), head(1), head(2), head(3)) else {
             break Chain::Stopped { offset: o };
         };
         let (size, data) = (size as usize, data as usize);
-        if data < 0x10 || data % 0x10 != 0 || data > size || o.checked_add(size).is_none_or(|e| e > scp.len())
+        if data < 0x10
+            || !data.is_multiple_of(0x10)
+            || data > size
+            || o.checked_add(size).is_none_or(|e| e > scp.len())
         {
             break Chain::Stopped { offset: o };
         }
@@ -303,7 +341,7 @@ pub fn decode(scp: &[u8]) -> Result<(Tables, Vec<Unread>)> {
             data,
         };
         tables.sections.push(s);
-        o += size;
+        o = offset(o, size)?;
     };
     for s in &tables.sections {
         if s.kind() == SECTION_SPOTS {
@@ -313,21 +351,26 @@ pub fn decode(scp: &[u8]) -> Result<(Tables, Vec<Unread>)> {
                 .and_then(|b| b.checked_add(s.data))
                 .is_some_and(|b| b == s.size);
             if fits && s.flags & 0xffff == 0 {
-                for k in 0..n {
-                    let at = s.offset + s.data + k * CHUNK;
-                    let word = |w: usize| v.u32(at + w, Endian::Big).field("spot chunk");
-                    let id = word(0x14)?;
+                let chunks = offset(s.offset, s.data)?;
+                for index in 0..s.count {
+                    let k = index as usize;
+                    let at = element(chunks, k, CHUNK, 0)?;
+                    let spot_word = |w: usize| word(v, offset(at, w)?, "spot chunk");
+                    let id = spot_word(0x14)?;
                     tables.spots.push(SpotChunk {
                         section: s.offset,
-                        index: k as u32,
-                        name: word(0x10)?,
+                        index,
+                        name: spot_word(0x10)?,
                         id,
-                        parent: word(0x18)?,
-                        class: word(0x1c)?,
-                        shape: word(0x20)?,
-                        pair: [word(0x24)?, word(0x28)?],
+                        parent: spot_word(0x18)?,
+                        class: spot_word(0x1c)?,
+                        shape: spot_word(0x20)?,
+                        pair: [spot_word(0x24)?, spot_word(0x28)?],
                         node: by_id.get(&id).copied(),
-                        world: matrix(v, s.offset + s.data + n * CHUNK + k * CHUNK_MATRIX)?,
+                        world: matrix(
+                            v,
+                            offset(element(chunks, n, CHUNK, 0)?, element(0, k, CHUNK_MATRIX, 0)?)?,
+                        )?,
                     });
                 }
                 continue;

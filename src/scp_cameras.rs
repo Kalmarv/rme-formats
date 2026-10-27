@@ -10,9 +10,9 @@
 //! frame pair; the engine function that uses them was not traced.
 use crate::Affine;
 use crate::scene::Unread;
-use crate::scp_tables::{Section, matrix};
-use crate::{Result, invalid};
-use primase_foundations::bytes::{Endian, Field, View};
+use crate::scp_tables::{Section, finite, matrix, word};
+use crate::{Result, element, invalid, offset};
+use primase_foundations::bytes::View;
 
 const RECORD: usize = 48;
 const MATRIX: usize = 64;
@@ -54,32 +54,39 @@ pub fn decode(scp: &[u8], s: &Section, unread: &mut Vec<Unread>) -> Result<Vec<S
         return Ok(Vec::new());
     }
     let mut out = Vec::with_capacity(n);
-    let (low, high) = (s.data + n * RECORD, s.size);
-    for i in 0..n {
-        let at = s.offset + s.data + i * RECORD;
-        let word = |k: usize| v.u32(at + 4 * k, Endian::Big).field("spot camera record");
+    let (low, high) = (element(s.data, n, RECORD, 0)?, s.size);
+    let records = offset(s.offset, s.data)?;
+    for index in 0..s.count {
+        let at = element(records, index as usize, RECORD, 0)?;
+        let record_word = |k: usize| word(v, element(at, k, 4, 0)?, "spot camera record");
         let mut frames = [Affine { cols: [[0.; 3]; 4] }; 2];
         for (frame, k) in frames.iter_mut().zip([7, 8]) {
-            let rel = word(k)? as usize;
+            let rel = record_word(k)? as usize;
             if rel < low || !rel.is_multiple_of(4) || rel.checked_add(MATRIX).is_none_or(|e| e > high) {
-                return Err(invalid(at + 4 * k, "scp: spot camera matrix outside its array"));
+                return Err(invalid(
+                    element(at, k, 4, 0)?,
+                    "scp: spot camera matrix outside its array",
+                ));
             }
-            *frame = matrix(v, s.offset + rel)?;
+            *frame = matrix(v, offset(s.offset, rel)?)?;
         }
-        let value = v.f32(at + 20, Endian::Big).field("spot camera record")?;
-        if !value.is_finite() {
-            return Err(invalid(at + 20, "scp: nonfinite spot camera value"));
-        }
+        let value = finite(
+            v,
+            offset(at, 20)?,
+            "spot camera record",
+            "scp: nonfinite spot camera value",
+        )?;
+        let [camera, target] = frames;
         out.push(SpotCamera {
             section: s.offset,
-            index: i as u32,
-            id: word(0)?,
-            name: word(2)?,
-            parent: word(4)?,
+            index,
+            id: record_word(0)?,
+            name: record_word(2)?,
+            parent: record_word(4)?,
             value,
-            flag: word(6)?,
-            camera: frames[0],
-            target: frames[1],
+            flag: record_word(6)?,
+            camera,
+            target,
         });
     }
     Ok(out)

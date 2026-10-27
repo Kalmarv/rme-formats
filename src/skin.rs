@@ -107,7 +107,11 @@ pub(crate) fn decode(
     while result.vertices.len() < count {
         let header = b.slice(cursor, 64)?;
         result.batches = result.batches.saturating_add(1);
-        b.require(cursor, offset(cursor, 64)? <= end, "processed batch exceeds stream")?;
+        b.require(
+            cursor,
+            offset(cursor, 64)? <= end,
+            "processed batch exceeds stream",
+        )?;
         let &[p0, p1, p2, p3, _, _, _, _, ref padding @ ..] = header else {
             return Err(b.error(cursor, "processed batch header is not 64 bytes"));
         };
@@ -116,7 +120,10 @@ pub(crate) fn decode(
         let active = short(b, offset(cursor, 6)?)?;
         b.require(
             offset(cursor, 4)?,
-            n > 0 && count.checked_sub(result.vertices.len()).is_some_and(|rest| n <= rest),
+            n > 0
+                && count
+                    .checked_sub(result.vertices.len())
+                    .is_some_and(|rest| n <= rest),
             "processed batch vertex count",
         )?;
         b.require(
@@ -134,7 +141,11 @@ pub(crate) fn decode(
         )?;
         b.require(
             offset(cursor, 8)?,
-            padding.as_chunks::<4>().0.iter().all(|w| *w == [0xdd, 0xcc, 0xbb, 0xaa]),
+            padding
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .all(|w| *w == [0xdd, 0xcc, 0xbb, 0xaa]),
             "processed batch padding",
         )?;
         cursor = offset(cursor, 64)?;
@@ -152,7 +163,9 @@ pub(crate) fn decode(
             b.require(
                 offset(cursor, 12)?,
                 weights.iter().map(|&w| u16::from(w)).sum::<u16>() == 255
-                    && weights.get(active..).is_some_and(|rest| rest.iter().all(|&w| w == 0)),
+                    && weights
+                        .get(active..)
+                        .is_some_and(|rest| rest.iter().all(|&w| w == 0)),
                 "processed weights must sum to 255 with inactive lanes zero",
             )?;
             let normal_bits = [
@@ -214,7 +227,9 @@ pub(crate) fn decode(
     b.slice(cursor, 64)?;
     b.require(
         cursor,
-        offset(cursor, 64)? == end && short(b, offset(cursor, 4)?)? == 0 && short(b, offset(cursor, 6)?)? == 0,
+        offset(cursor, 64)? == end
+            && short(b, offset(cursor, 4)?)? == 0
+            && short(b, offset(cursor, 6)?)? == 0,
         "processed stream terminal/size mismatch",
     )?;
     result.attributes.raw.insert(

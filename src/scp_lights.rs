@@ -8,9 +8,9 @@
 //! as a renderer's light (units, range, cone, which axis shines) is not established, so nothing here claims to be one.
 use crate::Affine;
 use crate::scene::Unread;
-use crate::scp_tables::Section;
-use crate::{Result, invalid};
-use primase_foundations::bytes::{Endian, Field, View};
+use crate::scp_tables::{Section, finite, matrix, word};
+use crate::{Result, element, invalid, offset};
+use primase_foundations::bytes::{Field, View};
 
 const RECORD: usize = 80;
 const MATRIX: usize = 64;
@@ -53,47 +53,43 @@ pub fn decode(scp: &[u8], s: &Section, unread: &mut Vec<Unread>) -> Result<Vec<S
         return Ok(Vec::new());
     }
     let mut out = Vec::with_capacity(n);
-    for i in 0..n {
-        let at = s.offset + s.data + i * RECORD;
-        let word = |k: usize| v.u32(at + 4 * k, Endian::Big).field("light record");
-        let float = |k: usize| -> Result<f32> {
-            let x = v.f32(at + 4 * k, Endian::Big).field("light record")?;
-            if x.is_finite() {
-                Ok(x)
-            } else {
-                Err(invalid(at + 4 * k, "scp: nonfinite light value"))
-            }
+    let records = offset(s.offset, s.data)?;
+    let matrices = element(s.data, n, RECORD, 0)?;
+    for index in 0..s.count {
+        let at = element(records, index as usize, RECORD, 0)?;
+        let record_word = |k: usize| word(v, element(at, k, 4, 0)?, "light record");
+        let float = |k: usize| {
+            finite(
+                v,
+                element(at, k, 4, 0)?,
+                "light record",
+                "scp: nonfinite light value",
+            )
         };
-        let m = s.offset + word(13)? as usize;
-        if m < s.offset + s.data + n * RECORD || m + MATRIX > s.offset + s.size {
-            return Err(invalid(at + 52, "scp: light matrix outside its array"));
+        let rel = record_word(13)? as usize;
+        if rel < matrices || rel.checked_add(MATRIX).is_none_or(|e| e > s.size) {
+            return Err(invalid(offset(at, 52)?, "scp: light matrix outside its array"));
         }
-        let mut cols = [[0.; 3]; 4];
-        for (j, col) in cols.iter_mut().enumerate() {
-            for (k, x) in col.iter_mut().enumerate() {
-                *x = v.f32(m + 16 * j + 4 * k, Endian::Big).field("light matrix")?;
-                if !x.is_finite() {
-                    return Err(invalid(m + 16 * j + 4 * k, "scp: nonfinite light matrix"));
-                }
-            }
-            let w = v.f32(m + 16 * j + 12, Endian::Big).field("light matrix")?;
-            if w != if j == 3 { 1. } else { 0. } {
-                return Err(invalid(m + 16 * j + 12, "scp: nonaffine light matrix"));
-            }
-        }
-        let mut buffer = [0; 16];
-        buffer.copy_from_slice(v.slice(at + 64, 16).field("light buffer")?);
+        let world = matrix(v, offset(s.offset, rel)?)?;
+        let buffer_at = offset(at, 64)?;
+        let buffer = <[u8; 16]>::try_from(v.slice(buffer_at, 16).field("light buffer")?)
+            .map_err(|_| invalid(buffer_at, "scp: light buffer is not 16 bytes"))?;
         out.push(SceneLight {
             section: s.offset,
-            index: i as u32,
-            kind: word(8)?,
+            index,
+            kind: record_word(8)?,
             rgba: [float(0)?, float(1)?, float(2)?, float(3)?],
-            name: word(4)?,
+            name: record_word(4)?,
             params: [float(5)?, float(6)?, float(7)?],
-            links: [word(9)?, word(10)?, word(11)?, word(12)?],
-            tail_words: [word(14)?, word(15)?],
+            links: [
+                record_word(9)?,
+                record_word(10)?,
+                record_word(11)?,
+                record_word(12)?,
+            ],
+            tail_words: [record_word(14)?, record_word(15)?],
             buffer,
-            world: Affine { cols },
+            world,
         });
     }
     Ok(out)

@@ -46,7 +46,16 @@ pub fn flythrough_rails(db: &Database<'_>, level: &str) -> Result<Option<Vec<Str
     };
     let mut out: Vec<String> = Vec::new();
     for r in &t.rows {
-        if let Value::Text(s) = &r.values[col] {
+        let value = r.values.get(col).ok_or_else(|| {
+            invalid(
+                0,
+                format!(
+                    "database: row {} of {} has no FLYTHROUGH_RAIL value",
+                    r.rowid, t.name
+                ),
+            )
+        })?;
+        if let Value::Text(s) = value {
             for p in s.split([';', ',', '&', '|']) {
                 let p = p.trim();
                 if !p.is_empty() && p != "-1" && !out.iter().any(|o| o == p) {

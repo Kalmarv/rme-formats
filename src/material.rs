@@ -152,7 +152,10 @@ pub fn record(bank: &str, b: &[u8], names: &UniformNames) -> Result<ShredMateria
         let hash = word(b, descriptor)?;
         let encoding = word(b, offset(descriptor, 4)?)?;
         if !matches!(encoding, 0x000100ad | 0x020100ad) {
-            return Err(invalid(offset(descriptor, 4)?, "unknown material parameter encoding"));
+            return Err(invalid(
+                offset(descriptor, 4)?,
+                "unknown material parameter encoding",
+            ));
         }
         expect(b, offset(descriptor, 8)?, u32::MAX)?;
         pointer(b, offset(descriptor, 12)?, pos)?;
@@ -262,7 +265,8 @@ pub fn bank(
         let size = (packed & 0x003fffff) as usize;
         let b = View::new(data).slice(pos, size).field("MDP record")?;
         let shader_at = offset(pos, 0x48)?;
-        let mut s = offset(word(b, 0x48)? as usize, 64).map_err(|_| invalid(shader_at, "shader offset overflow"))?;
+        let mut s =
+            offset(word(b, 0x48)? as usize, 64).map_err(|_| invalid(shader_at, "shader offset overflow"))?;
         let shader = string(b, &mut s)?;
         let m = record(name, b, &names(&shader)?)
             .map_err(|e| invalid(pos, format!("bank {name} id {id}: {e}")))?;
