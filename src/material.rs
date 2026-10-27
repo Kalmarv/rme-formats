@@ -1,7 +1,7 @@
 //! MBP/MDP bank records. All offsets are BE and MDP pointers are relative to +0x40.
 //! Opaque header/state fields are explicit data, not interpreted enums. New structural
 //! layouts, encoding words, sentinels, gaps, overlaps and nonzero padding are errors.
-use crate::{Result, invalid};
+use crate::{Result, element, invalid, offset};
 use primase_foundations::bytes::{Endian::Big, Field, View};
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
@@ -88,7 +88,9 @@ fn expect(b: &[u8], at: usize, value: u32) -> Result<()> {
     Ok(())
 }
 fn pointer(b: &[u8], at: usize, expected: usize) -> Result<()> {
-    if u64::from(word(b, at)?) + 64 != expected as u64 {
+    // MDP pointers are relative to +0x40
+    let stored = usize::try_from(word(b, at)?).ok().and_then(|p| p.checked_add(64));
+    if stored != Some(expected) {
         return Err(invalid(at, "material pointer gap, overlap or unexpected layout"));
     }
     Ok(())
@@ -101,11 +103,13 @@ fn string(b: &[u8], pos: &mut usize) -> Result<String> {
         .iter()
         .position(|&x| x == 0)
         .ok_or_else(|| invalid(*pos, "unterminated string"))?;
-    if !tail[..n].is_ascii() {
-        return Err(invalid(*pos, "non-ASCII source name"));
-    }
-    let out = String::from_utf8(tail[..n].to_vec()).map_err(|e| invalid(*pos, e))?;
-    *pos += n + 1;
+    let text = tail
+        .get(..n)
+        .filter(|text| text.is_ascii())
+        .ok_or_else(|| invalid(*pos, "non-ASCII source name"))?;
+    let out = String::from_utf8(text.to_vec()).map_err(|e| invalid(*pos, e))?;
+    *pos = offset(*pos, n)?;
+    *pos = offset(*pos, 1)?;
     Ok(out)
 }
 
@@ -141,25 +145,26 @@ pub fn record(bank: &str, b: &[u8], names: &UniformNames) -> Result<ShredMateria
         return Err(invalid(0x4c, "material counts exceed record"));
     }
     let descriptors = pos;
-    pos += np * 16;
+    pos = element(pos, np, 16, 0)?;
     let mut parameters = Vec::new();
     for i in 0..np {
-        let at = descriptors + 16 * i;
-        let hash = word(b, at)?;
-        let encoding = word(b, at + 4)?;
+        let descriptor = element(descriptors, i, 16, 0)?;
+        let hash = word(b, descriptor)?;
+        let encoding = word(b, offset(descriptor, 4)?)?;
         if !matches!(encoding, 0x000100ad | 0x020100ad) {
-            return Err(invalid(at + 4, "unknown material parameter encoding"));
+            return Err(invalid(offset(descriptor, 4)?, "unknown material parameter encoding"));
         }
-        expect(b, at + 8, u32::MAX)?;
-        pointer(b, at + 12, pos)?;
+        expect(b, offset(descriptor, 8)?, u32::MAX)?;
+        pointer(b, offset(descriptor, 12)?, pos)?;
         let mut value = [0.; 4];
         for (j, v) in value.iter_mut().enumerate() {
-            *v = View::new(b).f32(pos + 4 * j, Big).field("material value")?;
+            let value_at = element(pos, j, 4, 0)?;
+            *v = View::new(b).f32(value_at, Big).field("material value")?;
             if !v.is_finite() {
-                return Err(invalid(pos + 4 * j, "non-finite material value"));
+                return Err(invalid(value_at, "non-finite material value"));
             }
         }
-        pos += 16;
+        pos = offset(pos, 16)?;
         parameters.push(MaterialParameter {
             hash,
             name: names.get(&hash).cloned(),
@@ -170,41 +175,42 @@ pub fn record(bank: &str, b: &[u8], names: &UniformNames) -> Result<ShredMateria
     pointer(b, 0x58, pos)?;
     let mut samplers = Vec::new();
     for i in 0..nt {
-        let at = pos;
-        expect(b, at + 24, 0xffff000e)?;
-        let name = sampler_name(word(b, at + 16)?);
+        let sampler = pos;
+        expect(b, offset(sampler, 24)?, 0xffff000e)?;
+        let hash = word(b, offset(sampler, 16)?)?;
+        let name = sampler_name(hash);
         samplers.push(MaterialSampler {
-            slot: i as u32,
-            hash: word(b, at + 16)?,
+            slot: u32::try_from(i).map_err(|_| invalid(sampler, "sampler slot outside u32"))?,
+            hash,
             name: name.map(str::to_owned),
             name_source: name.map(|_| SamplerNameSource::ExecutableStringSdbm),
             texture: String::new(),
             unknown_state: [
-                word(b, at)?,
-                word(b, at + 4)?,
-                word(b, at + 8)?,
-                word(b, at + 12)?,
-                word(b, at + 20)?,
+                word(b, sampler)?,
+                word(b, offset(sampler, 4)?)?,
+                word(b, offset(sampler, 8)?)?,
+                word(b, offset(sampler, 12)?)?,
+                word(b, offset(sampler, 20)?)?,
             ],
         });
-        pos += 28;
+        pos = offset(sampler, 28)?;
     }
     pointer(b, 0x5c, pos)?;
     let paths = pos;
-    pos += nt * 4;
+    pos = element(pos, nt, 4, 0)?;
     for (i, sampler) in samplers.iter_mut().enumerate() {
-        pointer(b, paths + i * 4, pos)?;
+        pointer(b, element(paths, i, 4, 0)?, pos)?;
         sampler.texture = string(b, &mut pos)?;
     }
-    let aligned = pos
-        .checked_add(15)
-        .ok_or_else(|| invalid(pos, "alignment overflow"))?
-        & !15;
+    let aligned = offset(pos, 15)? & !15;
     if b.len() != aligned {
         return Err(invalid(pos, "record must end at next 16-byte boundary"));
     }
-    if let Some(i) = b[pos..].iter().position(|&x| x != 0) {
-        return Err(invalid(pos + i, "nonzero record padding"));
+    let padding = b
+        .get(pos..)
+        .ok_or_else(|| invalid(pos, "record padding outside record"))?;
+    if let Some(i) = padding.iter().position(|&x| x != 0) {
+        return Err(invalid(offset(pos, i)?, "nonzero record padding"));
     }
     Ok(ShredMaterial {
         key: MaterialKey {
@@ -234,38 +240,37 @@ pub fn bank(
         return Err(invalid(4, "MBP size"));
     }
     let n = word(index, 16)? as usize;
-    if n > index.len() / 12 || 24 + n * 12 != index.len() {
+    if n > index.len() / 12 || element(24, n, 12, 0)? != index.len() {
         return Err(invalid(16, "MBP table does not end at EOF"));
     }
     let mut out = Vec::new();
     let mut pos = 0;
     let mut ids = BTreeSet::new();
     for i in 0..n {
-        let at = 24 + i * 12;
-        let id = word(index, at)?;
+        let row = element(24, i, 12, 0)?;
+        let id = word(index, row)?;
         if !ids.insert(id) {
-            return Err(invalid(at, "duplicate material ID within bank"));
+            return Err(invalid(row, "duplicate material ID within bank"));
         }
-        if word(index, at + 4)? as usize != pos {
-            return Err(invalid(at + 4, "MDP slices must tile"));
+        if word(index, offset(row, 4)?)? as usize != pos {
+            return Err(invalid(offset(row, 4)?, "MDP slices must tile"));
         }
-        let packed = word(index, at + 8)?;
+        let packed = word(index, offset(row, 8)?)?;
         if packed & 0xffc00000 != 0x00400000 {
-            return Err(invalid(at + 8, "unknown packed size flags"));
+            return Err(invalid(offset(row, 8)?, "unknown packed size flags"));
         }
         let size = (packed & 0x003fffff) as usize;
         let b = View::new(data).slice(pos, size).field("MDP record")?;
-        let mut s = (word(b, 0x48)? as usize)
-            .checked_add(64)
-            .ok_or_else(|| invalid(pos + 0x48, "shader offset overflow"))?;
+        let shader_at = offset(pos, 0x48)?;
+        let mut s = offset(word(b, 0x48)? as usize, 64).map_err(|_| invalid(shader_at, "shader offset overflow"))?;
         let shader = string(b, &mut s)?;
         let m = record(name, b, &names(&shader)?)
             .map_err(|e| invalid(pos, format!("bank {name} id {id}: {e}")))?;
         if m.key.id != id {
-            return Err(invalid(pos + 16, "MBP/MDP ID mismatch"));
+            return Err(invalid(offset(pos, 16)?, "MBP/MDP ID mismatch"));
         }
         out.push(m);
-        pos += size;
+        pos = offset(pos, size)?;
     }
     if pos != data.len() {
         return Err(invalid(pos, "MDP trailing bytes"));
@@ -279,32 +284,36 @@ pub fn fragment_uniform_names(b: &[u8]) -> Result<UniformNames> {
     let mut out = UniformNames::new();
     let mut pos = 0;
     while pos < b.len() {
-        let tail = &b[pos..];
+        let tail = b
+            .get(pos..)
+            .ok_or_else(|| invalid(pos, "Cg program outside the payload"))?;
         expect(tail, 0, 0x1b5c)?;
         expect(tail, 4, 6)?;
         let size = word(tail, 8)? as usize;
         if size < 32 {
-            return Err(invalid(pos + 8, "Cg program too short"));
+            return Err(invalid(offset(pos, 8)?, "Cg program too short"));
         }
         let program = View::new(b).slice(pos, size).field("Cg program")?;
         let count = word(program, 12)? as usize;
-        let at = word(program, 16)? as usize;
+        let table = word(program, 16)? as usize;
         if count > size / 48 {
-            return Err(invalid(pos + 12, "Cg parameter count"));
+            return Err(invalid(offset(pos, 12)?, "Cg parameter count"));
         }
-        View::new(program).slice(at, count * 48).field("Cg parameters")?;
+        View::new(program)
+            .slice(table, element(0, count, 48, 0)?)
+            .field("Cg parameters")?;
         for i in 0..count {
+            let entry = element(table, i, 48, 0)?;
             // Cg variability 4102 is uniform; other interface classes cannot name
             // a material constant, even if their string happens to hash the same.
-            if word(program, at + i * 48 + 8)? != 4102 {
+            if word(program, offset(entry, 8)?)? != 4102 {
                 continue;
             }
-            let offset = word(program, at + i * 48 + 16)? as usize;
-            if offset == 0 {
+            let mut name_at = word(program, offset(entry, 16)?)? as usize;
+            if name_at == 0 {
                 continue;
             }
-            let mut offset = offset;
-            let name = string(program, &mut offset)?;
+            let name = string(program, &mut name_at)?;
             if name.is_empty() {
                 continue;
             }
@@ -313,20 +322,17 @@ pub fn fragment_uniform_names(b: &[u8]) -> Result<UniformNames> {
                 if let Some(old) = out.insert(h, n.into())
                     && old != n
                 {
-                    return Err(invalid(pos + at + i * 48, "Cg parameter name hash collision"));
+                    return Err(invalid(offset(pos, entry)?, "Cg parameter name hash collision"));
                 }
             }
         }
-        let next = pos
-            .checked_add(size)
-            .and_then(|n| n.checked_add(63))
-            .ok_or_else(|| invalid(pos, "Cg size overflow"))?
-            & !63;
+        let size_end = offset(pos, size)?;
+        let next = offset(size_end, 63)? & !63;
         let padding = View::new(b)
-            .slice(pos + size, next - pos - size)
+            .slice(size_end, next.saturating_sub(size_end))
             .field("Cg padding")?;
         if let Some(i) = padding.iter().position(|&x| x != 0) {
-            return Err(invalid(pos + size + i, "Cg nonzero padding"));
+            return Err(invalid(offset(size_end, i)?, "Cg nonzero padding"));
         }
         pos = next;
     }

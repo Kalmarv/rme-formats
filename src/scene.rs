@@ -10,7 +10,7 @@
 use crate::attributes::{self, Attributes};
 use crate::pak::Pak;
 use crate::skin::{SourceBone, SourceSkinVertex};
-use crate::{Affine, Result, invalid, scp_tables, skin};
+use crate::{Affine, Result, element, invalid, offset, scp_tables, skin};
 use std::{
     collections::{BTreeMap, BTreeSet},
     ops::Range,
@@ -90,7 +90,7 @@ pub(crate) struct Bytes<'a> {
 }
 impl<'a> Bytes<'a> {
     pub(crate) fn error(self, at: usize, reason: &str) -> crate::Error {
-        invalid(self.base + at, format!("{}: {reason}", self.file))
+        invalid(self.base.saturating_add(at), format!("{}: {reason}", self.file))
     }
     pub(crate) fn slice(self, at: usize, n: usize) -> Result<&'a [u8]> {
         let end = at
@@ -103,7 +103,7 @@ impl<'a> Bytes<'a> {
     fn sub(self, at: usize, n: usize) -> Result<Self> {
         Ok(Self {
             data: self.slice(at, n)?,
-            base: self.base + at,
+            base: offset(self.base, at)?,
             ..self
         })
     }
@@ -124,7 +124,7 @@ impl<'a> Bytes<'a> {
         Ok(n)
     }
     pub(crate) fn v3(self, at: usize) -> Result<[f32; 3]> {
-        Ok([self.f(at)?, self.f(at + 4)?, self.f(at + 8)?])
+        Ok([self.f(at)?, self.f(offset(at, 4)?)?, self.f(offset(at, 8)?)?])
     }
     pub(crate) fn require(self, at: usize, yes: bool, reason: &str) -> Result<()> {
         if yes { Ok(()) } else { Err(self.error(at, reason)) }
@@ -138,14 +138,16 @@ impl<'a> Bytes<'a> {
         )?;
         Ok(())
     }
-    pub(crate) fn matrix(self, at: usize) -> Result<Affine> {
-        self.slice(at, 64)?;
+    pub(crate) fn matrix(self, start: usize) -> Result<Affine> {
+        self.slice(start, 64)?;
         let mut cols = [[0.; 3]; 4];
         for (j, col) in cols.iter_mut().enumerate() {
-            *col = self.v3(at + j * 16)?;
+            let col_at = element(start, j, 16, 0)?;
+            *col = self.v3(col_at)?;
+            let w_at = offset(col_at, 12)?;
             self.require(
-                at + j * 16 + 12,
-                self.f(at + j * 16 + 12)? == if j == 3 { 1. } else { 0. },
+                w_at,
+                self.f(w_at)? == if j == 3 { 1. } else { 0. },
                 "nonaffine matrix",
             )?;
         }
@@ -163,14 +165,14 @@ fn coverage(b: Bytes<'_>, mut spans: Vec<Range<usize>>, padding: bool) -> Result
         .chain(std::iter::once(b.data.len()..b.data.len()))
     {
         b.require(r.start, r.start >= end, "overlapping ranges")?;
-        let gap = b.slice(end, r.start - end)?;
+        let gap = b.slice(end, r.start.saturating_sub(end))?;
         if !gap.is_empty() {
             b.require(end, padding, "unconsumed payload bytes")?;
             if let Some(i) = gap.iter().position(|&x| x != 0) {
-                return Err(b.error(end + i, "nonzero alignment/uncovered bytes"));
+                return Err(b.error(offset(end, i)?, "nonzero alignment/uncovered bytes"));
             }
         }
-        b.slice(r.start, r.end - r.start)?;
+        b.slice(r.start, r.len())?;
         end = r.end;
     }
     Ok(())
@@ -191,8 +193,8 @@ fn unread_gaps(b: Bytes<'_>, mut spans: Vec<Range<usize>>) -> Result<Vec<Unread>
         if r.start > end {
             unread.push(Unread {
                 file: b.file,
-                offset: b.base + end,
-                bytes: r.start - end,
+                offset: offset(b.base, end)?,
+                bytes: r.start.saturating_sub(end),
                 reason: "opaque mesh metadata outside decoded structures",
             });
         }
@@ -204,15 +206,15 @@ fn unread_gaps(b: Bytes<'_>, mut spans: Vec<Range<usize>>) -> Result<Vec<Unread>
 fn stream(b: Bytes<'_>, at: usize) -> Result<(usize, usize, Range<usize>)> {
     b.slice(at, 24)?;
     let count = b.u(at)?;
-    let stride = b.u(at + 8)?;
-    let off = b.u(at + 16)?;
-    let size = b.u(at + 20)?;
+    let stride = b.u(offset(at, 8)?)?;
+    let off = b.u(offset(at, 16)?)?;
+    let size = b.u(offset(at, 20)?)?;
     b.require(
-        at + 20,
+        offset(at, 20)?,
         count.checked_mul(stride) == Some(size),
         "stream size != count * stride",
     )?;
-    Ok((count, stride, off..off + size))
+    Ok((count, stride, off..offset(off, size)?))
 }
 
 /// Decode one quartet in source coordinates. Unsupported format variants are refused individually.
@@ -238,16 +240,16 @@ pub fn decode(scp: &[u8], mlp: &[u8], mmp: &[u8], mgp: &[u8]) -> Result<Scene> {
         file: "mgp",
         base: 0,
     };
-    s.require(0, s.u(0)? == 0xbabf003c, "bad magic/version")?;
+    s.require(0, s.w(0)? == 0xbabf003c, "bad magic/version")?;
     s.slice(0, 0x48)?;
-    l.require(0, l.u(0)? == 0xfafa0003, "bad magic/version")?;
+    l.require(0, l.w(0)? == 0xfafa0003, "bad magic/version")?;
     l.require(0x18, l.u(0x18)? == 28, "unsupported resource record size")?;
     let count = l.u(0x10)?;
     let data = l.u(0x14)?;
     l.table(28, count, 28)?;
     l.require(
         20,
-        data >= 28 + count * 28,
+        data >= element(28, count, 28, 0)?,
         "metadata base overlaps resource table",
     )?;
     l.slice(0, data)?;
@@ -261,20 +263,30 @@ pub fn decode(scp: &[u8], mlp: &[u8], mmp: &[u8], mgp: &[u8]) -> Result<Scene> {
     };
     let mut ids = BTreeSet::new();
     for i in 0..count {
-        let at = 28 + i * 28;
-        let id = l.u(at)? as u32;
-        l.require(at, ids.insert(id), "duplicate model ID")?;
-        let offsets = [data + l.u(at + 4)?, l.u(at + 8)?, l.u(at + 12)?];
-        let sizes = [l.u(at + 16)?, l.u(at + 20)?, l.u(at + 24)?];
-        for k in 0..3 {
-            spans[k].push(offsets[k]..offsets[k] + sizes[k]);
+        let record = element(28, i, 28, 0)?;
+        let id = l.w(record)?;
+        l.require(record, ids.insert(id), "duplicate model ID")?;
+        let offsets = [
+            offset(data, l.u(offset(record, 4)?)?)?,
+            l.u(offset(record, 8)?)?,
+            l.u(offset(record, 12)?)?,
+        ];
+        let sizes = [
+            l.u(offset(record, 16)?)?,
+            l.u(offset(record, 20)?)?,
+            l.u(offset(record, 24)?)?,
+        ];
+        for ((span, &start), &size) in spans.iter_mut().zip(&offsets).zip(&sizes) {
+            span.push(start..offset(start, size)?);
         }
-        let b = l.sub(offsets[0], sizes[0])?;
-        let cpu = m.sub(offsets[1], sizes[1])?;
-        let gpu = g.sub(offsets[2], sizes[2])?;
+        let [meta_at, cpu_at, gpu_at] = offsets;
+        let [meta_size, cpu_size, gpu_size] = sizes;
+        let b = l.sub(meta_at, meta_size)?;
+        let cpu = m.sub(cpu_at, cpu_size)?;
+        let gpu = g.sub(gpu_at, gpu_size)?;
         b.slice(0, 0xc0)?;
-        b.require(0, b.u(0)? == 0xbaba0031, "bad mesh magic/version")?;
-        b.require(0x80, b.u(0x80)? as u32 == id, "resource ID mismatch")?;
+        b.require(0, b.w(0)? == 0xbaba0031, "bad mesh magic/version")?;
+        b.require(0x80, b.w(0x80)? == id, "resource ID mismatch")?;
         b.require(
             16,
             b.matrix(16)? == Affine::IDENTITY,
@@ -283,7 +295,7 @@ pub fn decode(scp: &[u8], mlp: &[u8], mmp: &[u8], mgp: &[u8]) -> Result<Scene> {
         let bounds = [b.v3(0x60)?, b.v3(0x70)?];
         b.require(
             0x60,
-            (0..3).all(|k| bounds[0][k] <= bounds[1][k]),
+            bounds[0].iter().zip(&bounds[1]).all(|(low, high)| low <= high),
             "inverted bounds",
         )?;
         let vp = b.u(0x90)?;
@@ -295,7 +307,7 @@ pub fn decode(scp: &[u8], mlp: &[u8], mmp: &[u8], mgp: &[u8]) -> Result<Scene> {
         let (vc, stride, vr) = stream(b, vp)?;
         let embedded = extra != u32::MAX as usize;
         b.require(
-            vp + 8,
+            offset(vp, 8)?,
             stride == if embedded { 36 } else { 16 },
             "unsupported primary stride",
         )?;
@@ -304,40 +316,45 @@ pub fn decode(scp: &[u8], mlp: &[u8], mmp: &[u8], mgp: &[u8]) -> Result<Scene> {
         }
         b.slice(ip, 24)?;
         let ic = b.u(ip)?;
-        let io = b.u(ip + 8)?;
-        let size = b.u(ip + 12)?;
-        b.require(ip + 4, b.u(ip + 4)? == 5, "unsupported topology")?;
-        b.require(ip + 16, b.u(ip + 16)? == 1, "unsupported index type")?;
-        b.require(ip + 12, ic.checked_mul(2) == Some(size), "index size mismatch")?;
+        let io = b.u(offset(ip, 8)?)?;
+        let size = b.u(offset(ip, 12)?)?;
+        b.require(offset(ip, 4)?, b.u(offset(ip, 4)?)? == 5, "unsupported topology")?;
+        b.require(offset(ip, 16)?, b.u(offset(ip, 16)?)? == 1, "unsupported index type")?;
+        b.require(offset(ip, 12)?, ic.checked_mul(2) == Some(size), "index size mismatch")?;
         b.require(ip, ic.is_multiple_of(3), "index count is not a triangle list")?;
         let ib = cpu.slice(io, size)?;
         let indices: Vec<u32> = ib
             .as_chunks::<2>()
             .0
             .iter()
-            .map(|v| u16::from_be_bytes([v[0], v[1]]) as u32)
+            .map(|&pair| u32::from(u16::from_be_bytes(pair)))
             .collect();
         for (j, &index) in indices.iter().enumerate() {
-            cpu.require(io + j * 2, (index as usize) < vc, "index out of range")?;
+            cpu.require(element(io, j, 2, 0)?, (index as usize) < vc, "index out of range")?;
         }
         b.table(sp, ns, 96)?;
         let mut subs = Vec::new();
         let mut partition = Vec::new();
         for j in 0..ns {
-            let p = sp + j * 96;
-            let first = b.u(p + 32)?;
-            let n = b.u(p + 36)?;
+            let p = element(sp, j, 96, 0)?;
+            let first = b.u(offset(p, 32)?)?;
+            let n = b.u(offset(p, 36)?)?;
             b.require(
-                p + 32,
-                first <= ic && n <= ic - first && first.is_multiple_of(3) && n.is_multiple_of(3),
+                offset(p, 32)?,
+                ic.checked_sub(first).is_some_and(|rest| n <= rest)
+                    && first.is_multiple_of(3)
+                    && n.is_multiple_of(3),
                 "invalid submesh index span",
             )?;
-            b.require(p + 40, b.u(p + 40)? == 0, "unsupported base vertex")?;
-            partition.push(first..first + n);
+            b.require(offset(p, 40)?, b.u(offset(p, 40)?)? == 0, "unsupported base vertex")?;
+            let span = first..offset(first, n)?;
+            partition.push(span.clone());
+            let remap_at = offset(p, 56)?;
             subs.push(Submesh {
-                indices: first..first + n,
-                material: b.u(p + 52)? as u32,
-                uv_remap: b.slice(p + 56, 4)?.try_into().expect("four remap bytes"),
+                indices: span,
+                material: b.w(offset(p, 52)?)?,
+                uv_remap: <[u8; 4]>::try_from(b.slice(remap_at, 4)?)
+                    .map_err(|_| b.error(remap_at, "UV remap is not four bytes"))?,
             });
         }
         // A virtual byte per index allows the same exact-partition validation without allocating an index mask.
@@ -349,40 +366,45 @@ pub fn decode(scp: &[u8], mlp: &[u8], mmp: &[u8], mgp: &[u8]) -> Result<Scene> {
         }
         b.require(sp, end == ic, "submesh partition does not reach index end")?;
         let mut positions = Vec::new();
-        let format = b.u(0x8c)? as u32;
+        let format = b.w(0x8c)?;
         let mut attributes = Attributes::default();
         let mut processed = None;
         let mut processed_batches = 0;
-        let unsupported_uv = subs.iter().enumerate().find_map(|(i, sub)| {
-            sub.uv_remap
-                .iter()
-                .position(|&v| v > 3 && v != 255)
-                .map(|slot| b.base + sp + i * 96 + 56 + slot)
-        });
+        let unsupported_uv = subs
+            .iter()
+            .enumerate()
+            .find_map(|(i, sub)| {
+                sub.uv_remap
+                    .iter()
+                    .position(|&v| v > 3 && v != 255)
+                    .map(|slot| (i, slot))
+            })
+            .map(|(i, slot)| -> Result<usize> { offset(offset(b.base, element(sp, i, 96, 56)?)?, slot) })
+            .transpose()?;
         let refusal = if embedded {
             b.require(
                 0x94,
                 gp == u32::MAX as usize && gpu.data.is_empty(),
                 "unsupported embedded MGP stream",
             )?;
-            coverage(cpu, std::iter::once(io..io + size).collect(), false)?;
-            if format != 0x8007f || b.u(0xb4)? != 1 {
-                Some((b.base + 0x8c, "unsupported processed skin format/flags"))
-            } else if let Some(offset) = unsupported_uv {
-                Some((offset, "unsupported UV source selector"))
+            coverage(cpu, std::iter::once(io..offset(io, size)?).collect(), false)?;
+            if format != 0x8007f || b.w(0xb4)? != 1 {
+                Some((offset(b.base, 0x8c)?, "unsupported processed skin format/flags"))
+            } else if let Some(at) = unsupported_uv {
+                Some((at, "unsupported UV source selector"))
             } else {
-                if scene.source_bones.is_none() {
-                    scene.source_bones = Some(skin::skeleton(s)?);
-                }
-                let bones = scene.source_bones.as_ref().expect("source skeleton decoded");
+                let bones = match scene.source_bones {
+                    Some(ref bones) => bones,
+                    None => scene.source_bones.insert(skin::skeleton(s)?),
+                };
                 let decoded = skin::decode(b, extra, vc, bones.len(), bounds)?;
                 scene.unread.extend(unread_gaps(
                     b,
                     vec![
                         0..0xc0,
-                        sp..sp + ns * 96,
-                        vp..vp + 24,
-                        ip..ip + 24,
+                        sp..element(sp, ns, 96, 0)?,
+                        vp..offset(vp, 24)?,
+                        ip..offset(ip, 24)?,
                         decoded.stream,
                     ],
                 )?);
@@ -395,15 +417,19 @@ pub fn decode(scp: &[u8], mlp: &[u8], mmp: &[u8], mgp: &[u8]) -> Result<Scene> {
         } else {
             cpu.slice(vr.start, vr.len())?;
             for j in 0..vc {
-                let p = cpu.v3(vr.start + j * 16)?;
+                let p_at = element(vr.start, j, 16, 0)?;
+                let p = cpu.v3(p_at)?;
                 cpu.require(
-                    vr.start + j * 16,
-                    (0..3).all(|k| p[k] >= bounds[0][k] - 0.05 && p[k] <= bounds[1][k] + 0.05),
+                    p_at,
+                    p.iter()
+                        .zip(&bounds[0])
+                        .zip(&bounds[1])
+                        .all(|((v, low), high)| *v >= low - 0.05 && *v <= high + 0.05),
                     "position outside stored AABB (0.05 source-unit tolerance)",
                 )?;
                 positions.push(p);
             }
-            coverage(cpu, vec![vr.clone(), io..io + size], false)?;
+            coverage(cpu, vec![vr.clone(), io..offset(io, size)?], false)?;
             let (gs, gr) = if gp == u32::MAX as usize {
                 b.require(0x94, gpu.data.is_empty(), "missing MGP descriptor with payload")?;
                 (0, 0..0)
@@ -413,15 +439,20 @@ pub fn decode(scp: &[u8], mlp: &[u8], mmp: &[u8], mgp: &[u8]) -> Result<Scene> {
                 coverage(gpu, vec![gr.clone()], false)?;
                 (gs, gr)
             };
-            let mut meta = vec![0..0xc0, sp..sp + ns * 96, vp..vp + 24, ip..ip + 24];
+            let mut meta = vec![
+                0..0xc0,
+                sp..element(sp, ns, 96, 0)?,
+                vp..offset(vp, 24)?,
+                ip..offset(ip, 24)?,
+            ];
             if gp != u32::MAX as usize {
-                meta.push(gp..gp + 24);
+                meta.push(gp..offset(gp, 24)?);
             }
             scene.unread.extend(unread_gaps(b, meta)?);
             if attributes::stride(format).is_none() {
-                Some((b.base + 0x8c, "unsupported rigid vertex format mask"))
-            } else if let Some(offset) = unsupported_uv {
-                Some((offset, "unsupported UV source selector"))
+                Some((offset(b.base, 0x8c)?, "unsupported rigid vertex format mask"))
+            } else if let Some(at) = unsupported_uv {
+                Some((at, "unsupported UV source selector"))
             } else {
                 b.require(
                     0x94,
@@ -451,9 +482,10 @@ pub fn decode(scp: &[u8], mlp: &[u8], mmp: &[u8], mgp: &[u8]) -> Result<Scene> {
             refusal,
         });
     }
-    coverage(l, std::mem::take(&mut spans[0]), true)?;
-    coverage(m, std::mem::take(&mut spans[1]), true)?;
-    coverage(g, std::mem::take(&mut spans[2]), true)?;
+    let [meta_spans, cpu_spans, gpu_spans] = spans;
+    coverage(l, meta_spans, true)?;
+    coverage(m, cpu_spans, true)?;
+    coverage(g, gpu_spans, true)?;
     let n = s.u(16)?;
     let off = s.u(20)?;
     s.table(off, n, 48)?;
@@ -464,31 +496,31 @@ pub fn decode(scp: &[u8], mlp: &[u8], mmp: &[u8], mgp: &[u8]) -> Result<Scene> {
     // Other native-loader tables remain opaque. Processed skins already retain the named bone table.
     for (field, stride) in [(0x20, 16), (0x28, 56), (0x30, 512)] {
         let count = s.u(field)?;
-        let start = s.u(field + 4)?;
+        let start = s.u(offset(field, 4)?)?;
         if count > 0 && !(field == 0x20 && scene.source_bones.is_some()) {
             s.table(start, count, stride)?;
             scene.unread.push(Unread {
                 file: "scp",
                 offset: start,
-                bytes: count * stride,
+                bytes: element(0, count, stride, 0)?,
                 reason: "unknown scene table",
             });
         }
     }
     for i in 0..n {
-        let at = off + i * 48;
-        let id = s.u(at + 8)? as u32;
-        s.require(at + 8, ids.contains(&id), "placement references missing mesh")?;
+        let record = element(off, i, 48, 0)?;
+        let id = s.w(offset(record, 8)?)?;
+        s.require(offset(record, 8)?, ids.contains(&id), "placement references missing mesh")?;
+        let mut words = [0u32; 12];
+        for (j, word) in words.iter_mut().enumerate() {
+            *word = s.w(element(record, j, 4, 0)?)?;
+        }
         scene.placements.push(Placement {
             id,
-            transform: s.matrix(s.u(at)?)?,
-            offset: at,
-            words: (0..12)
-                .map(|j| s.u(at + j * 4).map(|v| v as u32))
-                .collect::<Result<Vec<_>>>()?
-                .try_into()
-                .map_err(|_| invalid(at, "placement word count"))?,
-            name: s.u(at + 12)? as u32,
+            transform: s.matrix(s.u(record)?)?,
+            offset: record,
+            words,
+            name: s.w(offset(record, 12)?)?,
         });
     }
     Ok(scene)
@@ -506,15 +538,19 @@ pub fn quartets(pak: &Pak) -> Result<BTreeMap<Vec<u8>, [usize; 4]>> {
         let Some(dot) = e.name.iter().rposition(|&c| c == b'.') else {
             continue;
         };
-        let slot = match &e.name[dot + 1..] {
-            b"scp" => 0,
-            b"mlp" => 1,
-            b"mmp" => 2,
-            b"mgp" => 3,
+        let (stem, extension) = e.name.split_at(dot);
+        let slot = match extension.get(1..) {
+            Some(b"scp") => 0,
+            Some(b"mlp") => 1,
+            Some(b"mmp") => 2,
+            Some(b"mgp") => 3,
             _ => continue,
         };
-        let group = groups.entry(e.name[..dot].to_vec()).or_insert([None; 4]);
-        if group[slot].replace(i).is_some() {
+        let group = groups.entry(stem.to_vec()).or_insert([None; 4]);
+        let cell = group
+            .get_mut(slot)
+            .ok_or_else(|| invalid(e.offset, "quartet extension slot"))?;
+        if cell.replace(i).is_some() {
             return Err(invalid(e.offset, "duplicate quartet extension"));
         }
     }

@@ -173,7 +173,7 @@ pub(crate) fn offset(base: usize, delta: usize) -> Result<usize> {
 
 /// `base + index * stride + field`: the offset of `field` in record `index` of a table at `base`, refused when any
 /// step overflows.
-pub(crate) fn at(base: usize, index: usize, stride: usize, field: usize) -> Result<usize> {
+pub(crate) fn element(base: usize, index: usize, stride: usize, field: usize) -> Result<usize> {
     index
         .checked_mul(stride)
         .and_then(|n| n.checked_add(base))

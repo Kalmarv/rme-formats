@@ -2,7 +2,7 @@
 //! vertex format mask. The layout follows the table at 0x1445920 in the game's executable (the variant selected by mask
 //! bit 0x80000). No tangent sign is inferred.
 use crate::scene::Bytes;
-use crate::{Result, at, offset};
+use crate::{Result, element, offset};
 use std::collections::BTreeMap;
 
 /// Decoded source lanes, padded with zero to four components. Values retain their source encoding's meaning.
@@ -65,7 +65,7 @@ pub(crate) fn decode(
         let n = cmp(u32::from_be_bytes([w0, w1, w2, w3]));
         let len = n.iter().map(|x| x * x).sum::<f32>().sqrt();
         cpu.require(
-            at(0, i, 16, 12)?,
+            element(0, i, 16, 12)?,
             len == 0. || (len - 1.).abs() <= 0.005,
             "nonunit CMP normal (0.005 tolerance)",
         )?;
@@ -83,7 +83,7 @@ pub(crate) fn decode(
             3
         };
         for i in 0..count {
-            let p = at(column, i, gpu_stride, 0)?;
+            let p = element(column, i, gpu_stride, 0)?;
             let mut v = [0.; 4];
             if bit == 1 {
                 for (dst, &src) in v.iter_mut().zip(gpu.slice(p, 4)?) {
@@ -94,7 +94,7 @@ pub(crate) fn decode(
                 v = [x, y, z, 0.];
             } else {
                 for (k, dst) in v.iter_mut().take(usize::from(lanes)).enumerate() {
-                    let lane_at = at(p, k, 2, 0)?;
+                    let lane_at = element(p, k, 2, 0)?;
                     let bytes = gpu.slice(lane_at, 2)?;
                     let &[hi, lo] = bytes else {
                         return Err(gpu.error(lane_at, "half-float lane is not two bytes"));
