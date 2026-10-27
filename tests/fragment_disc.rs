@@ -3,7 +3,7 @@
 mod inputs;
 
 use inputs::{Depth, Game, OracleSet, Query, depth, expect_found, install, oracle, scratch, seed};
-use primase_shred::read::pak::Pak;
+use rme_formats::pak::Pak;
 use rsx_reader::{
     cgbinary::{Stage, parse_prefix},
     fragment::{self, Control, Register, SourceKind, flow},

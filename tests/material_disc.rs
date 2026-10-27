@@ -3,7 +3,7 @@
 mod inputs;
 
 use inputs::{Game, install};
-use primase_shred::read::{
+use rme_formats::{
     material::{self, UniformNames},
     pak::Pak,
 };
@@ -104,7 +104,7 @@ fn all_material_banks_and_source_reference_census() {
                 assert_eq!(primase_foundations::hash::sdbm(name.as_bytes()), s.hash);
                 assert_eq!(
                     s.name_source,
-                    Some(primase_shred::components::SamplerNameSource::ExecutableStringSdbm)
+                    Some(rme_formats::material::SamplerNameSource::ExecutableStringSdbm)
                 );
                 named_samplers += 1;
             } else {
@@ -135,6 +135,7 @@ fn all_material_banks_and_source_reference_census() {
         "SHRED sampler names: {named_samplers} named / {} unnamed from executable-string dictionary",
         30_421 - named_samplers
     );
-    let mut world = primase_core::World::new();
-    assert_eq!(material::attach(&mut world, all).unwrap().len(), 4102);
+    // Every (bank, id) key is distinct.
+    let keys: BTreeSet<_> = all.iter().map(|m| m.key.clone()).collect();
+    assert_eq!(keys.len(), 4102);
 }

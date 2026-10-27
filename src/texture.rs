@@ -1,7 +1,6 @@
 //! Texture headers and all packaged copies, without selecting a residency or quality.
-use super::pak::Pak;
-use primase_core::{ColorSpace, TexRole, Texture};
-use primase_texcodec::gcm::CellGcmTexture;
+use crate::pak::Pak;
+use rsx_reader::gcm::CellGcmTexture;
 use std::borrow::Cow;
 use thiserror::Error;
 
@@ -12,7 +11,7 @@ pub enum Error {
     #[error("texture header at {offset:#x}: {detail}")]
     Header { offset: usize, detail: &'static str },
     #[error(transparent)]
-    Gcm(#[from] primase_texcodec::gcm::Error),
+    Gcm(#[from] rsx_reader::gcm::Error),
     #[error("texture {texture}: {detail}")]
     Copy { texture: usize, detail: &'static str },
 }
@@ -210,7 +209,7 @@ impl<'a> TextureCatalog<'a> {
         Some(&self.archives[record.archive].1.sections()[section].name)
     }
 
-    /// Keep an unsupported payload in the World without inventing a pixel layout.
+    /// The packaged payload bytes of a copy, exactly as stored, without inventing a pixel layout.
     pub fn encoded(&self, texture: usize, payload: Payload) -> Result<Cow<'_, [u8]>> {
         let record = self.records.get(texture).ok_or(Error::Copy {
             texture,
@@ -239,32 +238,10 @@ impl<'a> TextureCatalog<'a> {
         })
     }
 
-    /// Caller explicitly names a packaged payload and the texture's colour meaning.
-    /// Volumes are refused here; use `decode_volume` to retain their depth.
-    pub fn decode(
-        &self,
-        texture: usize,
-        payload: Payload,
-        color_space: ColorSpace,
-        role: TexRole,
-    ) -> Result<Vec<Texture>> {
-        let (gcm, first_mip, bytes) = self.pixel_data(texture, payload)?;
-        Ok(gcm.decode(&bytes, first_mip, color_space, role)?)
-    }
-
-    /// Decode an explicitly selected 3D copy without flattening it into core images.
-    pub fn decode_volume(
-        &self,
-        texture: usize,
-        payload: Payload,
-        color_space: ColorSpace,
-        role: TexRole,
-    ) -> Result<primase_texcodec::gcm::Volume> {
-        let (gcm, first_mip, bytes) = self.pixel_data(texture, payload)?;
-        Ok(gcm.decode_volume(&bytes, first_mip, color_space, role)?)
-    }
-
-    fn pixel_data(
+    /// The descriptor, first stored mip and stored bytes of the pixel payload `payload` of texture record `texture`,
+    /// for a caller that decodes the pixels. The payload is a complete mip chain from `first_mip`, or a separately
+    /// stored tail.
+    pub fn pixel_data(
         &self,
         texture: usize,
         payload: Payload,

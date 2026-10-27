@@ -1,5 +1,5 @@
 //! Compares the reader's tables with an oracle dump (`oracles/dump.py`: Python's sqlite3, values as typed hex).
-use primase_shred::read::database::{Database, Table, Value};
+use rme_formats::database::{Database, Table, Value};
 
 fn hex(s: &str) -> Vec<u8> {
     assert!(s.len().is_multiple_of(2), "odd hex {s:?}");

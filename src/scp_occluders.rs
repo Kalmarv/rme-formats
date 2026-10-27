@@ -9,10 +9,10 @@
 //! exactly. The only consumer found is the Lua binding `set_occluder_enabled`; the engine has no section handler
 //! for the type, so what the outline is measured in (the matrix's local space, by the stored values) is read from
 //! the data, not from the engine.
-use super::scene::Unread;
-use super::scp_tables::{Section, matrix};
+use crate::Affine;
+use crate::scene::Unread;
+use crate::scp_tables::{Section, matrix};
 use crate::{Result, invalid};
-use primase_core::Transform;
 use primase_foundations::bytes::{Endian, Field, View};
 
 const RECORD: usize = 16;
@@ -41,7 +41,7 @@ pub struct Occluder {
     /// Word 3 as stored: the low half is the shape ([`SHAPE_RECTANGLE`], [`SHAPE_BOX`]), the high half unknown.
     pub flags: u32,
     /// The record's matrix.
-    pub world: Transform,
+    pub world: Affine,
     /// The outline's segments, each as its two end points (x, y, z), as stored.
     pub outline: Vec<[[f32; 3]; 2]>,
 }

@@ -4,9 +4,8 @@
 //! the guide splines, which the navigation sets name `NavGuide_<set><n>` (`<set>` one or two capital letters, the
 //! sets `NAV_SET_START` in `<Level>_dropspots` names; `<n>` from 0). Splines whose ids hash none of these stay
 //! unnamed; the report counts them.
-use crate::read::database::{Database, Value};
-use crate::{Result, components::Spline, invalid};
-use primase_core::{Entity, Name, World};
+use crate::database::{Database, Value};
+use crate::{Result, invalid};
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
 
@@ -39,7 +38,7 @@ pub fn guide_name(id: u32) -> Option<&'static str> {
 pub fn flythrough_rails(db: &Database<'_>, level: &str) -> Result<Option<Vec<String>>> {
     let t = match db.table(&format!("{level}_sessions")) {
         Ok(t) => t,
-        Err(crate::read::database::Error::NoTable(_)) => return Ok(None),
+        Err(crate::database::Error::NoTable(_)) => return Ok(None),
         Err(e) => return Err(invalid(0, format!("database: {e}"))),
     };
     let Some(col) = t.column("FLYTHROUGH_RAIL") else {
@@ -57,30 +56,4 @@ pub fn flythrough_rails(db: &Database<'_>, level: &str) -> Result<Option<Vec<Str
         }
     }
     Ok(Some(out))
-}
-
-/// Give a `core.name` to every spline of `world` whose id is sdbm of a `NavGuide_` name or of one of `extra` (as
-/// written or lower-cased, the game hashes either). Returns how many splines were named.
-pub fn name_splines(world: &mut World, extra: &[String]) -> usize {
-    let mut by_hash: BTreeMap<u32, &str> = BTreeMap::new();
-    for name in extra {
-        for variant in [name.clone(), name.to_ascii_lowercase()] {
-            by_hash
-                .entry(primase_foundations::hash::sdbm(variant.as_bytes()))
-                .or_insert(name);
-        }
-    }
-    let found: Vec<(Entity, String)> = world
-        .iter::<Spline>()
-        .filter_map(|(e, s)| {
-            guide_name(s.id)
-                .or_else(|| by_hash.get(&s.id).copied())
-                .map(|n| (e, n.to_owned()))
-        })
-        .collect();
-    let n = found.len();
-    for (e, name) in found {
-        world.insert(e, Name(name));
-    }
-    n
 }

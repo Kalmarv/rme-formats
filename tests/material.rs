@@ -1,7 +1,5 @@
 //! Hand-worked offsets and values, independent of the reader; no source game bytes.
-use primase_core::World;
-use primase_shred::components::ShredMaterial;
-use primase_shred::read::material::{self, UniformNames};
+use rme_formats::material::{self, UniformNames};
 
 fn put(b: &mut [u8], at: usize, value: u32) {
     b[at..at + 4].copy_from_slice(&value.to_be_bytes());
@@ -92,11 +90,10 @@ fn hand_worked_record_and_banked_world() {
     })
     .unwrap();
     let c = material::bank("characters", &index(), &b, |_| Ok(names.clone())).unwrap();
-    let mut world = World::new();
-    assert_eq!(material::attach(&mut world, a.clone()).unwrap().len(), 1);
-    assert_eq!(material::attach(&mut world, c).unwrap().len(), 1);
-    assert!(material::attach(&mut world, a).is_err());
-    assert_eq!(world.iter::<ShredMaterial>().count(), 2);
+    assert_eq!((a.len(), c.len()), (1, 1));
+    assert_eq!(a[0].key.bank, "actors");
+    assert_eq!(c[0].key.bank, "characters");
+    assert_eq!(a[0].key.id, 7);
 }
 #[test]
 fn refuses_unexplained_structure_and_non_finite_values() {
@@ -184,4 +181,12 @@ fn fragment_reflection_is_local_and_checked() {
         put(&mut corrupt, at, v);
         assert!(material::fragment_uniform_names(&corrupt).is_err(), "at {at}");
     }
+}
+#[test]
+fn engine_dictionary_names_are_exact_hashes() {
+    for name in ["Color_Map", "Normal_Map", "Spec_Map", "Effect_Map"] {
+        let h = primase_foundations::hash::sdbm(name.as_bytes());
+        assert_eq!(material::sampler_name(h), Some(name));
+    }
+    assert_eq!(material::sampler_name(999), None);
 }

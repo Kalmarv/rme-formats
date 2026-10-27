@@ -1,15 +1,15 @@
 //! Pure quartet decoder. All offsets in diagnostics are relative to the named decoded file.
-//! Contracts: SHRED's stored bounds/tables and its native loader, documented in the game's geometry recon.
-use super::attributes::{self, Attributes};
-use super::{scp_tables, skin};
-use crate::{
-    Result,
-    components::{SourceBone, SourceSkinVertex},
-    invalid,
+//! Contracts: SHRED's stored bounds and tables, as its native loader reads them.
+use crate::attributes::{self, Attributes};
+use crate::pak::Pak;
+use crate::skin::{SourceBone, SourceSkinVertex};
+use crate::{Affine, Result, invalid, scp_tables, skin};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    ops::Range,
 };
-use primase_core::Transform;
-use std::{collections::BTreeSet, ops::Range};
 
+/// A span of a quartet file the reader accounts for but does not decode, with why.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Unread {
     pub file: &'static str,
@@ -44,7 +44,7 @@ pub struct Model {
 #[derive(Clone, Debug)]
 pub struct Placement {
     pub id: u32,
-    pub transform: Transform,
+    pub transform: Affine,
     /// Offset of this 48-byte record in its SCP, all source words, and its name hash (+0x0c).
     pub offset: usize,
     pub words: [u32; 12],
@@ -62,8 +62,8 @@ pub struct Scene {
 }
 
 #[derive(Clone, Copy)]
-pub(super) struct Bytes<'a> {
-    pub(super) data: &'a [u8],
+pub(crate) struct Bytes<'a> {
+    pub(crate) data: &'a [u8],
     file: &'static str,
     base: usize,
 }
@@ -71,7 +71,7 @@ impl<'a> Bytes<'a> {
     fn error(self, at: usize, reason: &str) -> crate::Error {
         invalid(self.base + at, format!("{}: {reason}", self.file))
     }
-    pub(super) fn slice(self, at: usize, n: usize) -> Result<&'a [u8]> {
+    pub(crate) fn slice(self, at: usize, n: usize) -> Result<&'a [u8]> {
         let end = at
             .checked_add(n)
             .ok_or_else(|| self.error(at, "range overflow"))?;
@@ -86,23 +86,23 @@ impl<'a> Bytes<'a> {
             ..self
         })
     }
-    pub(super) fn u(self, at: usize) -> Result<usize> {
+    pub(crate) fn u(self, at: usize) -> Result<usize> {
         Ok(u32::from_be_bytes(self.slice(at, 4)?.try_into().expect("four bytes")) as usize)
     }
-    pub(super) fn f(self, at: usize) -> Result<f32> {
+    pub(crate) fn f(self, at: usize) -> Result<f32> {
         let n = f32::from_bits(self.u(at)? as u32);
         if !n.is_finite() {
             return Err(self.error(at, "nonfinite float"));
         }
         Ok(n)
     }
-    pub(super) fn v3(self, at: usize) -> Result<[f32; 3]> {
+    pub(crate) fn v3(self, at: usize) -> Result<[f32; 3]> {
         Ok([self.f(at)?, self.f(at + 4)?, self.f(at + 8)?])
     }
-    pub(super) fn require(self, at: usize, yes: bool, reason: &str) -> Result<()> {
+    pub(crate) fn require(self, at: usize, yes: bool, reason: &str) -> Result<()> {
         if yes { Ok(()) } else { Err(self.error(at, reason)) }
     }
-    pub(super) fn table(self, at: usize, count: usize, stride: usize) -> Result<()> {
+    pub(crate) fn table(self, at: usize, count: usize, stride: usize) -> Result<()> {
         self.slice(
             at,
             count
@@ -111,7 +111,7 @@ impl<'a> Bytes<'a> {
         )?;
         Ok(())
     }
-    pub(super) fn matrix(self, at: usize) -> Result<Transform> {
+    pub(crate) fn matrix(self, at: usize) -> Result<Affine> {
         self.slice(at, 64)?;
         let mut cols = [[0.; 3]; 4];
         for (j, col) in cols.iter_mut().enumerate() {
@@ -122,7 +122,7 @@ impl<'a> Bytes<'a> {
                 "nonaffine matrix",
             )?;
         }
-        Ok(Transform { cols })
+        Ok(Affine { cols })
     }
 }
 
@@ -250,7 +250,7 @@ pub fn decode(scp: &[u8], mlp: &[u8], mmp: &[u8], mgp: &[u8]) -> Result<Scene> {
         b.require(0x80, b.u(0x80)? as u32 == id, "resource ID mismatch")?;
         b.require(
             16,
-            b.matrix(16)? == Transform::IDENTITY,
+            b.matrix(16)? == Affine::IDENTITY,
             "unsupported nonidentity mesh-local matrix",
         )?;
         let bounds = [b.v3(0x60)?, b.v3(0x70)?];
@@ -472,4 +472,54 @@ pub fn decode(scp: &[u8], mlp: &[u8], mmp: &[u8], mgp: &[u8]) -> Result<Scene> {
         });
     }
     Ok(scene)
+}
+
+/// The quartets of `pak`: entries sharing a stem (the raw archive name before the extension) with extensions `.scp`,
+/// `.mlp`, `.mmp` and `.mgp`, as indices into [`Pak::entries`] in that order. Stems are raw archive names, not host
+/// filesystem paths. A repeated extension or an incomplete quartet is refused.
+pub fn quartets(pak: &Pak) -> Result<BTreeMap<Vec<u8>, [usize; 4]>> {
+    let mut groups: BTreeMap<Vec<u8>, [Option<usize>; 4]> = BTreeMap::new();
+    for (i, e) in pak.entries().iter().enumerate() {
+        if e.attributes == 1 {
+            continue;
+        }
+        let Some(dot) = e.name.iter().rposition(|&c| c == b'.') else {
+            continue;
+        };
+        let slot = match &e.name[dot + 1..] {
+            b"scp" => 0,
+            b"mlp" => 1,
+            b"mmp" => 2,
+            b"mgp" => 3,
+            _ => continue,
+        };
+        let group = groups.entry(e.name[..dot].to_vec()).or_insert([None; 4]);
+        if group[slot].replace(i).is_some() {
+            return Err(invalid(e.offset, "duplicate quartet extension"));
+        }
+    }
+    groups
+        .into_iter()
+        .map(|(name, g)| {
+            if let [Some(a), Some(b), Some(c), Some(d)] = g {
+                Ok((name, [a, b, c, d]))
+            } else {
+                Err(invalid(
+                    0,
+                    format!("incomplete quartet {:?}", String::from_utf8_lossy(&name)),
+                ))
+            }
+        })
+        .collect()
+}
+
+/// Decode the quartet whose `.scp`, `.mlp`, `.mmp` and `.mgp` entries are `entries` (from [`quartets`]).
+pub fn decode_quartet(pak: &Pak, entries: [usize; 4]) -> Result<Scene> {
+    let [a, b, c, d] = entries;
+    decode(
+        &pak.payload(a)?,
+        &pak.payload(b)?,
+        &pak.payload(c)?,
+        &pak.payload(d)?,
+    )
 }

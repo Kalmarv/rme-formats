@@ -5,11 +5,11 @@
 //! name hash, `5..7` three f32 parameters, `8` a kind code, `9..12` four words (-1, 0, 0, -1 or -2 in the lights seen),
 //! `13` the matrix's offset from the section start, `14` and `15` two words (0 except for one kind), `16..19` a
 //! 16-byte buffer holding leftover text and numbers. The records say what a light is made of; what they mean
-//! as a renderer's light (units, range, cone, which axis shines) is not established, so nothing here is a core light.
-use super::scene::Unread;
-use super::scp_tables::Section;
+//! as a renderer's light (units, range, cone, which axis shines) is not established, so nothing here claims to be one.
+use crate::Affine;
+use crate::scene::Unread;
+use crate::scp_tables::Section;
 use crate::{Result, invalid};
-use primase_core::Transform;
 use primase_foundations::bytes::{Endian, Field, View};
 
 const RECORD: usize = 80;
@@ -34,7 +34,7 @@ pub struct SceneLight {
     /// Words 16 to 19: leftover bytes of the editor's name buffer, kept raw.
     pub buffer: [u8; 16],
     /// The matrix at word 13. For kinds 7 and 8 it carries the volume's scale; kind 1's translation is not the sun's.
-    pub world: Transform,
+    pub world: Affine,
 }
 
 pub fn decode(scp: &[u8], s: &Section, unread: &mut Vec<Unread>) -> Result<Vec<SceneLight>> {
@@ -93,7 +93,7 @@ pub fn decode(scp: &[u8], s: &Section, unread: &mut Vec<Unread>) -> Result<Vec<S
             links: [word(9)?, word(10)?, word(11)?, word(12)?],
             tail_words: [word(14)?, word(15)?],
             buffer,
-            world: Transform { cols },
+            world: Affine { cols },
         });
     }
     Ok(out)

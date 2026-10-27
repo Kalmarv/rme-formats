@@ -1,5 +1,5 @@
 //! Hand-worked framing and raw RFC 1951 fixtures; no encoder of ours makes the expected bytes.
-use primase_shred::read::{cstr, pak::Pak};
+use rme_formats::{cstr, pak::Pak};
 
 fn u16be(b: &mut Vec<u8>, n: u16) {
     b.extend(n.to_be_bytes());

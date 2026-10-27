@@ -2,7 +2,7 @@
 //! 512-byte pages, two b-tree levels, overflow chains, every integer width, reals, NULLs, a rowid alias.
 #[path = "database_oracle/mod.rs"]
 mod common;
-use primase_shred::read::database::{Database, Error, Value};
+use rme_formats::database::{Database, Error, Value};
 
 const DB: &[u8] = include_bytes!("fixtures/multi.db");
 const TSV: &str = include_str!("fixtures/multi.tsv");

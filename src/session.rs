@@ -1,11 +1,41 @@
 //! MAIN.DB's level/session/goal/task rows. This reader records relationships without activating them.
-use super::database::{Database, Table, Value};
-use crate::{
-    Result,
-    components::{SessionGraph, SessionIdentifier, SessionRow},
-    invalid,
-};
+use crate::database::{Database, Table, Value};
+use crate::{Result, invalid};
+use serde::Serialize;
 use std::collections::BTreeMap;
+
+/// One exact token of an IDENTIFIERS cell and its case-sensitive sdbm.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct SessionIdentifier {
+    pub name: String,
+    pub hash: u32,
+}
+
+/// All cells of a row, including unknown columns and unparsed relationship expressions.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct SessionRow {
+    pub rowid: i64,
+    pub id: u32,
+    /// MAIN.DB stores these columns as TEXT. SQL NULL remains distinct from an empty string.
+    pub fields: BTreeMap<String, Option<String>>,
+    /// Ampersand-separated names, excluding empty/none/NULL/-1 sentinel cells.
+    pub identifiers: Vec<SessionIdentifier>,
+}
+
+/// One explicit level row and all rows of its session, goal and task tables, as source data.
+/// No active session or task state is chosen; TASKS_OPT brackets/ranges remain authored text.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct SessionGraph {
+    pub level_id: u32,
+    pub level: SessionRow,
+    pub session_table: String,
+    pub goal_table: String,
+    pub task_table: String,
+    /// Source rowid order, including duplicate logical IDs (observed in Papa_tasks).
+    pub sessions: Vec<SessionRow>,
+    pub goals: Vec<SessionRow>,
+    pub tasks: Vec<SessionRow>,
+}
 
 fn text<'a>(row: &'a SessionRow, column: &str, table: &str) -> Result<&'a str> {
     row.fields.get(column).and_then(Option::as_deref).ok_or_else(|| {

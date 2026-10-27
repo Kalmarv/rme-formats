@@ -1,7 +1,14 @@
-//! Native table 0x1445920, packed variant selected by mask bit 0x80000; no inferred core tangent sign.
-use super::scene::Bytes;
-use crate::{Result, components::VertexInput};
+//! Native table 0x1445920, packed variant selected by mask bit 0x80000; no tangent sign is inferred.
+use crate::Result;
+use crate::scene::Bytes;
 use std::collections::BTreeMap;
+
+/// Decoded source lanes, padded with zero to four components. Values retain their source encoding's meaning.
+#[derive(Clone, Debug, PartialEq)]
+pub struct VertexInput {
+    pub lanes: u8,
+    pub values: Vec<[f32; 4]>,
+}
 
 #[derive(Clone, Debug, Default)]
 pub struct Attributes {
@@ -28,7 +35,7 @@ pub fn cmp(word: u32) -> [f32; 3] {
 }
 
 /// Byte size from the native declaration entries; unsupported flags/entries refuse this model.
-pub(super) fn stride(mask: u32) -> Option<usize> {
+pub(crate) fn stride(mask: u32) -> Option<usize> {
     if mask & !0x807ff != 0 || mask & 0x80005 != 0x80005 {
         return None;
     }
@@ -40,7 +47,7 @@ pub(super) fn stride(mask: u32) -> Option<usize> {
     )
 }
 
-pub(super) fn decode(
+pub(crate) fn decode(
     mask: u32,
     count: usize,
     cpu: Bytes<'_>,

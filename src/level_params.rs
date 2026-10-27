@@ -1,17 +1,50 @@
 //! A level's parameter script: the calls of `script\vfx_level_load_<level>.lua` with literal arguments.
 //!
 //! The scripts are Lua 5.1 bytecode in the scripts archive (which the game stores encrypted; decrypting it is the
-//! caller's, outside primase). A level's script sets its look by calling engine functions with numbers and strings. A
+//! caller's). A level's script sets its look by calling engine functions with numbers and strings. A
 //! call is read when its callee is a global (or a path of fields) and every argument is a literal; the rest are
 //! counted in the report with why. A script with control flow is not read at all: which of its calls run depends on
 //! values this reader does not evaluate.
-use super::pak::Pak;
-use crate::{
-    Result,
-    components::{LevelParams, ScriptCall, ScriptValue},
-    invalid,
-};
+use crate::pak::Pak;
+use crate::{Result, invalid};
 use lua51_bytecode::{Chunk, Op, Value, calls};
+use serde::Serialize;
+
+/// A literal argument of a level script's call.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub enum ScriptValue {
+    Nil,
+    Bool(bool),
+    Number(f64),
+    Text(String),
+}
+
+/// One call of a level script as the script makes it: the callee as the global it names (`change_fog`) or a path
+/// through fields (`GAME.Level.GetLevelManager`), and its arguments, each a literal.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ScriptCall {
+    pub function: String,
+    pub args: Vec<ScriptValue>,
+}
+
+/// The parameters one level's `vfx_level_load_<level>` script sets (fog, shadow, bloom, back light, LUT, ...), as the
+/// script's calls in order. Nothing here says what a call's arguments mean or what unit they are in; that is the
+/// engine function's.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct LevelParams {
+    /// The level the caller named.
+    pub level: String,
+    /// The script's name in the archive, as stored.
+    pub script: String,
+    pub calls: Vec<ScriptCall>,
+}
+
+impl LevelParams {
+    /// The calls of `function`, in script order.
+    pub fn calls_to<'a>(&'a self, function: &'a str) -> impl Iterator<Item = &'a ScriptCall> {
+        self.calls.iter().filter(move |c| c.function == function)
+    }
+}
 
 /// The scripts archive and the level whose script to read (`charlie`, `mike`, ...).
 #[derive(Clone, Copy, Debug)]
@@ -30,29 +63,6 @@ pub struct ParamsReport {
     pub unread: Vec<(usize, String)>,
     /// The script has control flow or nested functions, so none of its calls were taken.
     pub branching: bool,
-}
-
-impl ParamsReport {
-    pub fn lines(&self) -> primase_core::convert::Report {
-        let text = match (&self.script, self.branching) {
-            (None, _) => format!("no vfx_level_load script for level {}", self.level),
-            (Some(s), true) => {
-                format!("{s} has control flow or nested functions; none of its calls are read")
-            }
-            (Some(s), false) => {
-                let mut t = format!(
-                    "{s}: {} calls read as data, {} not read",
-                    self.read,
-                    self.unread.len()
-                );
-                for (pc, why) in &self.unread {
-                    t.push_str(&format!("; instruction {pc}: {why}"));
-                }
-                t
-            }
-        };
-        vec![("shred level params".into(), text)]
-    }
 }
 
 fn name_of(v: &Value) -> Option<String> {

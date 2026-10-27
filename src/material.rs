@@ -1,19 +1,66 @@
 //! MBP/MDP bank records. All offsets are BE and MDP pointers are relative to +0x40.
 //! Opaque header/state fields are explicit data, not interpreted enums. New structural
 //! layouts, encoding words, sentinels, gaps, overlaps and nonzero padding are errors.
-use crate::components::{MaterialKey, MaterialParameter, MaterialSampler, SamplerNameSource, ShredMaterial};
 use crate::{Result, invalid};
-use primase_core::{Entity, World};
 use primase_foundations::bytes::{Endian::Big, Field, View};
+use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
+
+/// IDs are local to a bank: ID zero occurs in all three banks.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+pub struct MaterialKey {
+    pub bank: String,
+    pub id: u32,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct MaterialParameter {
+    pub hash: u32,
+    /// Only named by an exact sdbm join against this material's fragment program.
+    pub name: Option<String>,
+    /// Original descriptor word. The high bits' semantics remain unknown.
+    pub source_encoding: u32,
+    /// Four stored f32 values, including unused lanes, in source order.
+    pub value: [f32; 4],
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct MaterialSampler {
+    /// Descriptor ordinal; no claim that this is a hardware texture unit.
+    pub slot: u32,
+    pub hash: u32,
+    /// Exact sdbm join against an engine string; not Cg reflection or inferred use.
+    pub name: Option<String>,
+    pub name_source: Option<SamplerNameSource>,
+    /// Empty is a source empty binding, not a generated default texture.
+    pub texture: String,
+    /// Descriptor +0, +4, +8, +12, +20. State semantics are not yet decoded.
+    pub unknown_state: [u32; 5],
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub enum SamplerNameSource {
+    ExecutableStringSdbm,
+}
+
+/// A bank material, retained as authored: no shading conversion and no render-state guesses.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ShredMaterial {
+    pub key: MaterialKey,
+    /// Header +0x1c, +0x28, +0x2c, +0x3c, respectively.
+    pub unknown_header: [u32; 4],
+    pub vertex_shader: String,
+    pub fragment_shader: String,
+    pub parameters: Vec<MaterialParameter>,
+    pub samplers: Vec<MaterialSampler>,
+}
 
 /// Reflected names from the bound fragment program, indexed by the source hash.
 pub type UniformNames = BTreeMap<u32, String>;
 
-/// Recovered from the shipped executable's own NUL-terminated strings. The
-/// exact sdbm matches identify names only, not texture-unit or shading semantics.
-/// Source executable SHA256 and the exhaustive dictionary census are documented
-/// in the crate README. No compiled Cg parameter table supplied these names.
+/// The four sampler names the shipped executable carries as NUL-terminated strings, found by their exact sdbm
+/// hashes. A match identifies a name only, not a texture unit or a shading role. No compiled Cg parameter table
+/// supplied these names.
 pub fn sampler_name(hash: u32) -> Option<&'static str> {
     match hash {
         0x95591c40 => Some("Color_Map"),
@@ -218,28 +265,6 @@ pub fn bank(
     }
     if pos != data.len() {
         return Err(invalid(pos, "MDP trailing bytes"));
-    }
-    Ok(out)
-}
-
-/// Attach one entity per (bank, id). P3's mesh ID-to-bank resolution is a later join.
-/// Reject duplicate keys before mutating the world.
-pub fn attach(world: &mut World, materials: Vec<ShredMaterial>) -> Result<BTreeMap<MaterialKey, Entity>> {
-    let mut keys = BTreeSet::new();
-    for m in &materials {
-        if !keys.insert(m.key.clone()) {
-            return Err(invalid(0, "duplicate (bank,id) material"));
-        }
-    }
-    if world.iter::<ShredMaterial>().any(|(_, m)| keys.contains(&m.key)) {
-        return Err(invalid(0, "material key already attached"));
-    }
-    let mut out = BTreeMap::new();
-    for m in materials {
-        let key = m.key.clone();
-        let e = world.spawn();
-        world.insert(e, m);
-        out.insert(key, e);
     }
     Ok(out)
 }

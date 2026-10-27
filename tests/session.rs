@@ -1,9 +1,5 @@
 //! Hand-written rows persisted by Python SQLite: source fields, exact hashes, no selected mode.
-use primase_core::{Instance, convert::Reader, frame::SourceFrame};
-use primase_shred::{
-    components::{SessionGraph, SessionRow},
-    read::convert::ShredReader,
-};
+use rme_formats::session::{SessionGraph, SessionRow};
 const DB: &[u8] = include_bytes!("fixtures/sessions.db");
 fn row(rows: &[SessionRow], id: u32) -> &SessionRow {
     rows.iter().find(|r| r.id == id).expect("fixture row")
@@ -55,17 +51,4 @@ fn rows_and_relationship_expressions_stay_authored() {
         duplicates[1].fields["unknown"].as_deref(),
         Some("preserve duplicate")
     );
-}
-
-#[test]
-fn supplied_graph_is_data_without_a_session_choice() {
-    let graph = SessionGraph::from_main_db(DB, 7).expect("synthetic graph");
-    let mut reader = ShredReader::new(vec![], SourceFrame::WORLD).with_sessions(graph.clone());
-    let (world, report) = reader.read().expect("empty geometry with graph");
-    assert_eq!(world.resource::<SessionGraph>(), Some(&graph));
-    assert_eq!(world.iter::<Instance>().count(), 0);
-    assert!(report.iter().any(|(_, s)| s.contains("no session selected")));
-    assert!(world.verify_components().is_empty());
-    let (loaded, _) = reader.load_all(world).expect("graph survives load");
-    assert_eq!(loaded.resource::<SessionGraph>(), Some(&graph));
 }

@@ -1,7 +1,7 @@
-//! `read::pixel_program::classify` on hand-laid pixel-program containers (header 0..32, one 48-byte parameter record,
-//! 24-byte descriptor, strings, embedded-constant table, microcode), then the pass on a classified material.
+//! `pixel_program::classify` on hand-laid pixel-program containers (header 0..32, one 48-byte parameter record,
+//! 24-byte descriptor, strings, embedded-constant table, microcode).
 #![allow(clippy::unwrap_used, clippy::indexing_slicing)]
-use primase_shred::{components::PixelProgram, read::pixel_program::classify};
+use rme_formats::pixel_program::{PixelProgram, classify};
 
 const XYZW: u32 = (1 << 11) | (2 << 13) | (3 << 15);
 

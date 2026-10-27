@@ -3,10 +3,20 @@
 //! A program that samples one texture at the first texture coordinate and only copies or multiplies the result with
 //! uniforms reads no normal, light, fog or other interpolant: whatever it draws does not depend on lighting. Every
 //! other program is not classified (the answer is "not known", not "lit").
-use crate::components::PixelProgram;
 use crate::{Result, invalid};
 use rsx_reader::cgbinary::{self, Stage};
 use rsx_reader::fragment::{self, Opcode, SourceKind};
+use serde::Serialize;
+
+/// What a material's pixel program does, from its microcode and not its name.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub enum PixelProgram {
+    /// Not classified: anything but the case below. This does not say the program is lit.
+    Unclassified,
+    /// Samples texture unit `unit` at the first texture coordinate and only copies or multiplies the sample with the
+    /// uniforms `uniforms` (by their program names): no normal, light, fog or other interpolant is read.
+    ScaledTexture { unit: u32, uniforms: Vec<String> },
+}
 
 /// The fragment input register of the first texture coordinate (RSX: position, two colours, fog, then TEX0).
 const TEX0: u8 = 4;

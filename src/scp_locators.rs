@@ -4,10 +4,10 @@
 //! `data + count * 80`. Record words (big-endian): `0` a class hash (sdbm of `RMLocator` in the one record there is),
 //! `1` the name hash, `2` a kind hash (sdbm of `Waypoint`), `3` the matrix's offset from the section start. The
 //! files hold one such record (the `echo` level's); the class and kind are named by their hashes.
-use super::scene::Unread;
-use super::scp_tables::{Section, matrix};
+use crate::Affine;
+use crate::scene::Unread;
+use crate::scp_tables::{Section, matrix};
 use crate::{Result, invalid};
-use primase_core::Transform;
 use primase_foundations::bytes::{Endian, Field, View};
 
 const RECORD: usize = 16;
@@ -20,7 +20,7 @@ pub struct Locator {
     pub class: u32,
     pub name: u32,
     pub kind: u32,
-    pub world: Transform,
+    pub world: Affine,
 }
 
 /// The class and kind names whose hashes the locator record carries (sdbm of the name).

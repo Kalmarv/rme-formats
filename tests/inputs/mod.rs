@@ -40,12 +40,6 @@ primase_testdata::inputs! {
             about: r#"TSV of every table of SHRED's MAIN.DB (sqlite_master first): `@table` and its column names, then one line per row, its rowid and typed values (`n`, `i:`, `r:` big-endian double, `t:` UTF-8 and `b:` as hex); worlds/shred/tests/main_db.rs"#,
             source: r#"independent: Python's standard-library sqlite3 (SQLite's own C library) reading the database read-only, worlds/shred/tests/oracles/sqlite_dump.py"#,
         },
-        Query::Oracle(OracleSet::Corpus, Game::Shred, "scripts.pak") => {
-            status: Live,
-            gate: true,
-            about: r#"SHRED's scripts archive, decrypted: the PAK (version 4) inside the disc's `SCRIPTS.SDAT`, whose `script\*.lua` entries are Lua 5.1 bytecode (1,278 scripts, 1,459,346 bytes); worlds/shred/tests/level_params_disc.rs"#,
-            source: r#"the user's own disc's SCRIPTS.SDAT decrypted outside primase by RPCS3's own decryptor (`rpcs3 --headless --decrypt`, no key in primase); the plaintext PAK is used unchanged"#,
-        },
         Query::Oracle(OracleSet::Rpcs3, Game::Shred, "fragment") => {
             status: Live,
             gate: true,

@@ -1,18 +1,10 @@
 //! A level script written out byte by byte (little-endian Lua 5.1, as the game's scripts are) inside a hand-framed
 //! PAK: the calls with literal arguments are read in order, a call with a variable argument is reported, a script with
-//! control flow is not read, and a missing script is a report line, not an error.
+//! control flow is not read, and a missing script is not an error.
 #![allow(clippy::unwrap_used, clippy::indexing_slicing)]
-use primase_core::{
-    convert::{self, Reader},
-    frame::SourceFrame,
-};
-use primase_shred::{
-    components::{LevelParams, ScriptCall, ScriptValue},
-    read::{
-        convert::ShredReader,
-        level_params::{ScriptInputs, read_level_params},
-        pak::Pak,
-    },
+use rme_formats::{
+    level_params::{LevelParams, ScriptCall, ScriptInputs, ScriptValue, read_level_params},
+    pak::Pak,
 };
 
 /// `ESC Lua`, 0x51, format 0, little-endian (1), int 4, size_t 4, instruction 4, number 8, not integral.
@@ -168,11 +160,7 @@ fn a_level_without_a_script_is_a_report_line() {
     })
     .unwrap();
     assert!(params.is_none() && report.script.is_none());
-    assert!(
-        report.lines()[0]
-            .1
-            .contains("no vfx_level_load script for level yankee")
-    );
+    assert_eq!(report.level, "yankee");
 }
 
 #[test]
@@ -184,7 +172,7 @@ fn a_script_with_control_flow_is_not_read() {
     })
     .unwrap();
     assert!(params.is_none() && report.branching && report.read == 0);
-    assert!(report.lines()[0].1.contains("control flow"));
+    assert_eq!(report.script.as_deref(), Some("script\\vfx_level_load_zulu.lua"));
 }
 
 #[test]
@@ -196,24 +184,4 @@ fn a_script_that_is_not_a_chunk_is_refused_by_name() {
     })
     .unwrap_err();
     assert!(e.to_string().contains("vfx_level_load_zulu.lua"), "{e}");
-}
-
-#[test]
-fn the_reader_puts_the_parameters_in_the_world_as_a_resource() {
-    let scripts = pak(&[("script\\vfx_level_load_zulu.lua", &script())]);
-    let mut reader = ShredReader::new(vec![], SourceFrame::WORLD).with_scripts(ScriptInputs {
-        scripts: &scripts,
-        level: "zulu",
-    });
-    let (world, lines) = reader.read().unwrap();
-    convert::check_emits(&world, reader.emits(), "read").unwrap();
-    assert!(world.verify_resources().is_empty());
-    let params = world.resource::<LevelParams>().unwrap();
-    assert_eq!(params.calls_to("change_fog").count(), 1);
-    assert!(
-        lines
-            .iter()
-            .any(|(k, v)| k == "shred level params" && v.contains("3 calls read as data, 1 not read"))
-    );
-    assert_eq!(reader.params.read, 3);
 }

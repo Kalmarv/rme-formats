@@ -1,6 +1,6 @@
 //! Hand-worked SCP blob: an occluder section of a rectangle and a box, then the end record; and the damage the
 //! reader must refuse or report.
-use primase_shred::read::{
+use rme_formats::{
     scp_occluders::{SHAPE_BOX, SHAPE_RECTANGLE},
     scp_tables::{self, Chain},
 };

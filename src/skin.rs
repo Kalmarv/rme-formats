@@ -1,12 +1,31 @@
 //! Processed 64-byte skin records, from the native preprocessing writer (0x430e38 / 0x430b28).
-use super::{attributes::Attributes, scene::Bytes};
-use crate::{
-    Result,
-    components::{SourceBone, SourceSkinVertex, VertexInput},
-};
+use crate::attributes::{Attributes, VertexInput};
+use crate::scene::Bytes;
+use crate::{Affine, Result};
 use std::ops::Range;
 
-pub(super) struct Decoded {
+/// One bone of a mesh's source skeleton, as its SCP stores it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SourceBone {
+    pub words: [u32; 2],
+    pub name: Vec<u8>,
+    /// Original SCP matrix; its space and the two words' runtime roles remain unproved.
+    pub matrix: Affine,
+}
+
+/// One source vertex's palette and quantized weights. 255 is an inactive bone, with zero weight.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SourceSkinVertex {
+    pub bones: [u8; 4],
+    pub weights: [u8; 4],
+    /// Original float bits, including stock NaNs.
+    pub normal_bits: [u32; 3],
+    /// Source +28, whose output colour role is unproved.
+    pub extra: u32,
+    pub padding: [u8; 8],
+}
+
+pub(crate) struct Decoded {
     pub positions: Vec<[f32; 3]>,
     pub attributes: Attributes,
     pub vertices: Vec<SourceSkinVertex>,
@@ -14,7 +33,7 @@ pub(super) struct Decoded {
     pub batches: usize,
 }
 
-pub(super) fn skeleton(scp: Bytes<'_>) -> Result<Vec<SourceBone>> {
+pub(crate) fn skeleton(scp: Bytes<'_>) -> Result<Vec<SourceBone>> {
     let count = scp.u(0x20)?;
     let table = scp.u(0x24)?;
     scp.require(0x20, count > 0, "processed skin has no source skeleton")?;
@@ -40,7 +59,7 @@ fn short(b: Bytes<'_>, at: usize) -> Result<usize> {
     Ok(usize::from(u16::from_be_bytes([bytes[0], bytes[1]])))
 }
 
-pub(super) fn decode(
+pub(crate) fn decode(
     b: Bytes<'_>,
     ep: usize,
     count: usize,

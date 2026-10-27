@@ -1,6 +1,6 @@
 //! Hand-worked SCP blob: a rail-candidate spline section, an AI-path section, a guide section and a light section,
 //! then the end record; and the damage the readers must refuse or report.
-use primase_shred::read::{
+use rme_formats::{
     scp_splines::SplineKind,
     scp_tables::{self, Chain},
 };

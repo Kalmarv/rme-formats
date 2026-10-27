@@ -8,10 +8,10 @@
 //! parent id, `5` an f32 (53.638 in every record), `6` a flag (1 in every record), `7` and `8` the offsets, from the
 //! section start, of the two matrices. That these are cameras is read from the spot names (`..._Cam12_...`) and the
 //! frame pair; the engine function that uses them was not traced.
-use super::scene::Unread;
-use super::scp_tables::{Section, matrix};
+use crate::Affine;
+use crate::scene::Unread;
+use crate::scp_tables::{Section, matrix};
 use crate::{Result, invalid};
-use primase_core::Transform;
 use primase_foundations::bytes::{Endian, Field, View};
 
 const RECORD: usize = 48;
@@ -32,10 +32,10 @@ pub struct SpotCamera {
     /// Word 6.
     pub flag: u32,
     /// The first matrix (word 7): the frame the record places, which the second looks along. Unproven reading.
-    pub camera: Transform,
+    pub camera: Affine,
     /// The second matrix (word 8): the frame of the point looked at. Unproven reading: its linear part is
     /// diag(-1, 1, 1) in 159 of 281 records.
-    pub target: Transform,
+    pub target: Affine,
 }
 
 pub fn decode(scp: &[u8], s: &Section, unread: &mut Vec<Unread>) -> Result<Vec<SpotCamera>> {
@@ -58,7 +58,7 @@ pub fn decode(scp: &[u8], s: &Section, unread: &mut Vec<Unread>) -> Result<Vec<S
     for i in 0..n {
         let at = s.offset + s.data + i * RECORD;
         let word = |k: usize| v.u32(at + 4 * k, Endian::Big).field("spot camera record");
-        let mut frames = [Transform { cols: [[0.; 3]; 4] }; 2];
+        let mut frames = [Affine { cols: [[0.; 3]; 4] }; 2];
         for (frame, k) in frames.iter_mut().zip([7, 8]) {
             let rel = word(k)? as usize;
             if rel < low || !rel.is_multiple_of(4) || rel.checked_add(MATRIX).is_none_or(|e| e > high) {

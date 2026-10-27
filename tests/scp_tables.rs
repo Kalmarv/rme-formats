@@ -1,7 +1,7 @@
 //! Hand-worked SCP: two nodes with a child and a placement link, world matrices, a spot section of two chunks, a
 //! type-0xE section whose data starts 0x20 in, and the end record.
-use primase_core::Transform;
-use primase_shred::read::scp_tables::{self, Chain, class_name, shape_name};
+use rme_formats::Affine;
+use rme_formats::scp_tables::{self, Chain, class_name, shape_name};
 
 fn word(b: &mut [u8], at: usize, n: u32) {
     b[at..at + 4].copy_from_slice(&n.to_be_bytes());
@@ -134,7 +134,7 @@ fn nodes_links_matrices_and_spot_chunks() {
     assert_eq!(class_name(t.spots[1].class), None);
     assert_eq!(
         s.world,
-        Transform {
+        Affine {
             cols: [[1., 0., 0.], [0., 1., 0.], [0., 0., 1.], [10., 0., 5.]]
         }
     );

@@ -4,7 +4,7 @@
     clippy::disallowed_types,
     reason = "reader I/O: open the caller's archive"
 )]
-use super::cstr;
+use crate::cstr;
 use crate::{Result, invalid};
 use primase_foundations::bytes::{Endian::Big, Field, View};
 use std::{borrow::Cow, ops::Range, path::Path};

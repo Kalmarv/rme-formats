@@ -8,8 +8,8 @@
 //! `4` 1 (3 once), `5` point count, `6` a second count (equal to `5` except in a few records), `7` and `8` small
 //! integers, `9` surface id, `10` pointer to a 64-byte matrix, `11` pointer to `count` world-space points (3 x f32),
 //! `12` pointer to `count` f32 that increase from 0 (not arc length), `13` unread.
-use super::scene::Unread;
-use super::scp_tables::Section;
+use crate::scene::Unread;
+use crate::scp_tables::Section;
 use crate::{Result, invalid};
 use primase_foundations::bytes::{Endian, Field, View};
 
@@ -67,7 +67,7 @@ impl SplineKind {
         }
     }
 
-    /// The `kind` of the core `Curve` made from a spline of this kind.
+    /// A short label for what a spline of this kind is: `rail_candidate`, `guide`, `ai_path`, `nav_path` or `short_path`.
     pub fn curve_kind(self) -> &'static str {
         match self {
             Self::RailCandidate => "rail_candidate",

@@ -10,9 +10,9 @@
 //! difficulty a program wants, are the caller's. The row-to-map-id join is the level's Lua load script (`LoadData`
 //! constants in the encrypted `SCRIPTS.SDAT`), which this reader does not read; [`Manifest::map_ids`] gives the
 //! candidates (a level's maps) from the archives themselves.
-use super::{level, pak::Pak};
-use crate::read::database::{Database, Value};
+use crate::database::{Database, Value};
 use crate::{Result, invalid};
+use crate::{pak::Pak, scene};
 
 /// A layer archive's difficulty nibble.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -113,18 +113,14 @@ fn number(v: &Value) -> Option<u32> {
     }
 }
 
-fn cell<'a>(
-    row: &'a crate::read::database::Row,
-    t: &crate::read::database::Table,
-    col: &str,
-) -> Result<&'a Value> {
+fn cell<'a>(row: &'a crate::database::Row, t: &crate::database::Table, col: &str) -> Result<&'a Value> {
     let i = t
         .column(col)
         .ok_or_else(|| invalid(0, format!("database: table {:?} has no column {col}", t.name)))?;
     Ok(&row.values[i])
 }
 
-fn db_error(e: crate::read::database::Error) -> crate::Error {
+fn db_error(e: crate::database::Error) -> crate::Error {
     invalid(0, format!("database: {e}"))
 }
 
@@ -195,7 +191,7 @@ impl Manifest {
             ..Manifest::default()
         };
         for &(file, pak) in paks {
-            let quartets: Vec<Vec<u8>> = level::quartets(pak)?.into_keys().collect();
+            let quartets: Vec<Vec<u8>> = scene::quartets(pak)?.into_keys().collect();
             if let Some((difficulty, session_type, map_id)) = parse_layer_name(file) {
                 m.layers.push(LayerPak {
                     file: file.into(),
@@ -287,7 +283,7 @@ impl Manifest {
 pub fn drop_spots(db: &Database<'_>, level: &str) -> Result<Option<Vec<DropSpot>>> {
     let t = match db.table(&format!("{level}_dropspots")) {
         Ok(t) => t,
-        Err(crate::read::database::Error::NoTable(_)) => return Ok(None),
+        Err(crate::database::Error::NoTable(_)) => return Ok(None),
         Err(e) => return Err(db_error(e)),
     };
     let mut out = Vec::new();
@@ -308,35 +304,4 @@ pub fn drop_spots(db: &Database<'_>, level: &str) -> Result<Option<Vec<DropSpot>
         });
     }
     Ok(Some(out))
-}
-
-/// The spot chunks of `world` (a level's `read_level`) that a drop spot names: those whose name hash is sdbm of the
-/// row's `SPOT_NAME`, as written or lower-cased (the game hashes either). Rows with no `SPOT_NAME` (`-1`, `na`) or no
-/// matching chunk have an empty list. The chunks are all classes; the caller checks `shred.spot` class.
-pub fn resolve_drop_spots<'a>(
-    world: &primase_core::World,
-    rows: &'a [DropSpot],
-) -> Vec<(&'a DropSpot, Vec<primase_core::Entity>)> {
-    let mut by_name: std::collections::BTreeMap<u32, Vec<primase_core::Entity>> =
-        std::collections::BTreeMap::new();
-    for (e, s) in world.iter::<crate::components::Spot>() {
-        by_name.entry(s.name).or_default().push(e);
-    }
-    rows.iter()
-        .map(|r| {
-            let mut hits = Vec::new();
-            for variant in [r.spot_name.clone(), r.spot_name.to_ascii_lowercase()] {
-                for e in by_name
-                    .get(&primase_foundations::hash::sdbm(variant.as_bytes()))
-                    .into_iter()
-                    .flatten()
-                {
-                    if !hits.contains(e) {
-                        hits.push(*e);
-                    }
-                }
-            }
-            (r, hits)
-        })
-        .collect()
 }

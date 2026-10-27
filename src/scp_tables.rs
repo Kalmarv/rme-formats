@@ -12,14 +12,14 @@
 //! cameras (`scp_cameras`), type 4 lights (`scp_lights`), type 5 locators (`scp_locators`) and type 0xB
 //! occluders (`scp_occluders`).
 //! Every other type is listed with its flags, size and count and reported unread.
-use super::scene::Unread;
-use super::scp_cameras::{self, SpotCamera};
-use super::scp_lights::{self, SceneLight};
-use super::scp_locators::{self, Locator};
-use super::scp_occluders::{self, Occluder};
-use super::scp_splines::{self, Spline, SplineKind};
+use crate::Affine;
+use crate::scene::Unread;
+use crate::scp_cameras::{self, SpotCamera};
+use crate::scp_lights::{self, SceneLight};
+use crate::scp_locators::{self, Locator};
+use crate::scp_occluders::{self, Occluder};
+use crate::scp_splines::{self, Spline, SplineKind};
 use crate::{Result, invalid};
-use primase_core::Transform;
 use primase_foundations::bytes::{Endian, Field, View};
 
 /// A node's links are `0x70`-byte records.
@@ -41,7 +41,7 @@ pub struct Node {
     /// The world-matrix table entry's hash: a group name's hash for group nodes, a model's for single-mesh nodes,
     /// else 0.
     pub matrix_hash: u32,
-    pub world: Transform,
+    pub world: Affine,
     /// Words `+0x00..+0x0F` as floats when any is non-zero: centre and radius of a bounding sphere. Unproven: the
     /// centre lies 0.57 to 73 from the node's translation in one checked file.
     pub sphere: Option<[f32; 4]>,
@@ -97,7 +97,7 @@ pub struct SpotChunk {
     pub pair: [u32; 2],
     /// The node whose `id` equals `id`, when there is one.
     pub node: Option<u32>,
-    pub world: Transform,
+    pub world: Affine,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -147,7 +147,7 @@ pub fn shape_name(hash: u32) -> Option<&'static str> {
         .find(|n| primase_foundations::hash::sdbm(n.as_bytes()) == hash)
 }
 
-pub(super) fn matrix(v: View<'_>, at: usize) -> Result<Transform> {
+pub(crate) fn matrix(v: View<'_>, at: usize) -> Result<Affine> {
     let mut cols = [[0.; 3]; 4];
     for (j, col) in cols.iter_mut().enumerate() {
         for (k, x) in col.iter_mut().enumerate() {
@@ -161,7 +161,7 @@ pub(super) fn matrix(v: View<'_>, at: usize) -> Result<Transform> {
             return Err(invalid(at + j * 16 + 12, "scp: nonaffine matrix"));
         }
     }
-    Ok(Transform { cols })
+    Ok(Affine { cols })
 }
 
 fn table(total: usize, count: usize, at: usize, stride: usize, what: &str) -> Result<()> {

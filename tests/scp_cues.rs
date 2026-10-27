@@ -1,6 +1,6 @@
 //! Hand-worked SCP blob: a spot camera section (two records) and a locator section, then the end record; and the
 //! damage the readers must refuse or report.
-use primase_shred::read::scp_tables::{self, Chain};
+use rme_formats::scp_tables::{self, Chain};
 
 fn word(b: &mut [u8], at: usize, n: u32) {
     b[at..at + 4].copy_from_slice(&n.to_be_bytes());

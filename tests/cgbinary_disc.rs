@@ -3,7 +3,7 @@
 mod inputs;
 
 use inputs::{Depth, Game, Query, depth, expect_found, install, seed};
-use primase_shred::read::pak::Pak;
+use rme_formats::pak::Pak;
 use rsx_reader::cgbinary::{Stage, parse_prefix};
 use std::path::{Path, PathBuf};
 
