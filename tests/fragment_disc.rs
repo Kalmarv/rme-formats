@@ -133,7 +133,7 @@ fn compare(p: &fragment::Program, reference: &Value) -> (usize, usize, usize) {
                 SourceKind::Input(n) => {
                     assert_eq!(e["kind"], "input");
                     assert_eq!(e["index"], n);
-                    assert_eq!(e["perspective"], i.perspective_input);
+                    assert_eq!(e["perspective"], i.interpolant_flag);
                 }
                 SourceKind::Constant => {
                     assert_eq!(e["kind"], "constant");

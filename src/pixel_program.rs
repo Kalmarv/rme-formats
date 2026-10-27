@@ -72,7 +72,7 @@ fn classify_program(program: &cgbinary::Program<'_>) -> Result<PixelProgram> {
                 let coordinate = i.sources.first().filter(|s| {
                     s.kind == SourceKind::Input(TEX0) && s.swizzle == [0, 1, 2, 3] && !s.negate && !s.absolute
                 });
-                if unit.is_some() || coordinate.is_none() || i.perspective_input || i.indexed_input {
+                if unit.is_some() || coordinate.is_none() || i.interpolant_flag || i.indexed_input {
                     return Ok(PixelProgram::Unclassified);
                 }
                 unit = i.texture_unit;
