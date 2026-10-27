@@ -33,32 +33,67 @@ impl TextureHeader {
             offset: 0,
             detail: "expected exactly 84 bytes",
         })?;
-        let word = |i| u32::from_be_bytes([raw[i], raw[i + 1], raw[i + 2], raw[i + 3]]);
-        for (offset, expected) in [
-            (0, 0xafaf0003),
-            (4, 84),
-            (8, 0x003c0000),
-            (12, 0xbeefface),
-            (52, 0),
-            (56, 60),
+        let (chunks, _) = raw.as_chunks::<4>();
+        let words: Vec<u32> = chunks.iter().map(|c| u32::from_be_bytes(*c)).collect();
+        // The 84 bytes are 21 words: the constants, then the opaque words and the GCM descriptor from +60.
+        let Ok(
+            [
+                magic,
+                size,
+                tag,
+                face,
+                opaque_10,
+                extents,
+                _,
+                opaque_1c,
+                opaque_20,
+                _,
+                _,
+                _,
+                _,
+                zero,
+                gcm_at,
+                _,
+                _,
+                _,
+                _,
+                _,
+                _,
+            ],
+        ) = <[u32; 21]>::try_from(words)
+        else {
+            return Err(Error::Header {
+                offset: 0,
+                detail: "expected 21 words",
+            });
+        };
+        for (offset, found, expected) in [
+            (0, magic, 0xafaf0003),
+            (4, size, 84),
+            (8, tag, 0x003c0000),
+            (12, face, 0xbeefface),
+            (52, zero, 0),
+            (56, gcm_at, 60),
         ] {
-            if word(offset) != expected {
+            if found != expected {
                 return Err(Error::Header {
                     offset,
                     detail: "header constant mismatch",
                 });
             }
         }
-        let gcm = CellGcmTexture::parse(&raw[60..])?;
-        if u16::from_be_bytes([raw[20], raw[21]]) != gcm.width
-            || u16::from_be_bytes([raw[22], raw[23]]) != gcm.height
-        {
+        let descriptor = raw.get(60..).ok_or(Error::Header {
+            offset: 60,
+            detail: "descriptor outside the header",
+        })?;
+        let gcm = CellGcmTexture::parse(descriptor)?;
+        if extents >> 16 != u32::from(gcm.width) || extents & 0xffff != u32::from(gcm.height) {
             return Err(Error::Header {
                 offset: 20,
                 detail: "header and GCM extents differ",
             });
         }
-        let opaque_words = [(16, word(16)), (28, word(28)), (32, word(32))];
+        let opaque_words = [(16, opaque_10), (28, opaque_1c), (32, opaque_20)];
         Ok(Self {
             raw,
             gcm,
@@ -131,7 +166,10 @@ impl<'a> TextureCatalog<'a> {
                     continue;
                 };
                 let header = TextureHeader::parse(&pak.payload(header_entry)?)?;
-                let section_name = entry.section.map(|s| pak.sections()[s].name.as_slice());
+                let section_name = entry
+                    .section
+                    .and_then(|s| pak.sections().get(s))
+                    .map(|s| s.name.as_slice());
                 let residency = match section_name {
                     Some(b"TEXTURES_STREAMED" | b"ACTORS_STREAMED") => Residency::Streamed,
                     Some(b"TEXTURES_PREFETCH" | b"ACTORS_PREFETCH") => Residency::Prefetch,
@@ -155,7 +193,11 @@ impl<'a> TextureCatalog<'a> {
                 };
                 let matches_section = |section: Option<usize>| {
                     section == entry.section
-                        || local.is_some_and(|name| section.is_some_and(|s| pak.sections()[s].name == name))
+                        || local.is_some_and(|name| {
+                            section
+                                .and_then(|s| pak.sections().get(s))
+                                .is_some_and(|s| s.name == name)
+                        })
                 };
                 let find = |name: &[u8], first_mip| -> Result<Option<PixelSource>> {
                     let mut found = pak
@@ -206,7 +248,8 @@ impl<'a> TextureCatalog<'a> {
     pub fn section_name(&self, texture: usize) -> Option<&[u8]> {
         let record = self.records.get(texture)?;
         let section = record.section?;
-        Some(&self.archives[record.archive].1.sections()[section].name)
+        let (_, pak) = self.archives.get(record.archive)?;
+        Some(pak.sections().get(section)?.name.as_slice())
     }
 
     /// The record, the pixel source of `payload` and the archive that holds it.

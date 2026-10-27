@@ -10,9 +10,13 @@
     reason = "reader I/O: open the caller's archive"
 )]
 use crate::cstr;
-use crate::{Result, invalid};
+use crate::{Result, invalid, offset};
 use primase_foundations::bytes::{Endian::Big, Field, View};
 use std::{borrow::Cow, ops::Range, path::Path};
+
+/// Bytes before the first entry row, and the size of a row.
+const HEADER: usize = 16;
+const ROW: usize = 32;
 
 /// One entry of the archive's table: a file, or a section marker (`attributes == 1`).
 #[derive(Debug)]
@@ -73,56 +77,62 @@ impl Pak {
         let count = v.u32(8, Big).field("entry count")? as usize;
         let strsize = v.u32(12, Big).field("string table size")? as usize;
         let strstart = count
-            .checked_mul(32)
-            .and_then(|n| n.checked_add(16))
+            .checked_mul(ROW)
+            .and_then(|n| n.checked_add(HEADER))
             .ok_or_else(|| invalid(8, "entry count overflow"))?;
         let strings = v.slice(strstart, strsize).field("string table")?;
-        let mut pos = strstart + strsize;
+        let mut pos = offset(strstart, strsize)?;
         let mut entries = Vec::new();
         let mut sections: Vec<Section> = Vec::new();
         for i in 0..count {
-            let at = 16 + i * 32;
-            let hash = v.u32(at, Big).field("entry hash")?;
-            let name_off = v.u32(at + 4, Big).field("name offset")? as usize;
+            // the table up to `strstart` was checked to fit, so no row start overflows
+            let at = offset(HEADER, i.saturating_mul(ROW))?;
+            let word =
+                |k: usize, what: &'static str| -> Result<u32> { Ok(v.u32(offset(at, k)?, Big).field(what)?) };
+            let hash = word(0, "entry hash")?;
+            let name_off = word(4, "name offset")? as usize;
             let tail = strings
                 .get(name_off..)
-                .ok_or_else(|| invalid(at + 4, "name offset outside string table"))?;
-            let len = tail
+                .ok_or_else(|| invalid(at.saturating_add(4), "name offset outside string table"))?;
+            let name = tail
                 .iter()
                 .position(|&b| b == 0)
-                .ok_or_else(|| invalid(strstart + name_off, "unterminated name"))?;
-            let name = &tail[..len];
+                .and_then(|len| tail.get(..len))
+                .ok_or_else(|| invalid(strstart.saturating_add(name_off), "unterminated name"))?;
             if primase_foundations::hash::sdbm(name) != hash {
                 return Err(invalid(at, "name hash mismatch"));
             }
-            let attributes = v.u32(at + 8, Big).field("attributes")?;
+            let attributes = word(8, "attributes")?;
             if !matches!(attributes, 0..=2) {
-                return Err(invalid(at + 8, "unknown entry attributes"));
+                return Err(invalid(offset(at, 8)?, "unknown entry attributes"));
             }
-            let alignment = v.u32(at + 12, Big).field("alignment")?;
+            let alignment = word(12, "alignment")?;
             if !matches!(alignment, 0 | 16 | 64 | 128) {
-                return Err(invalid(at + 12, "unknown alignment"));
+                return Err(invalid(offset(at, 12)?, "unknown alignment"));
             }
-            let offset = v.u32(at + 16, Big).field("payload offset")? as usize;
-            let size = v.u32(at + 20, Big).field("payload size")? as usize;
-            let compressed_size = v.u32(at + 24, Big).field("compressed size")? as usize;
-            if v.u32(at + 28, Big).field("runtime offset")? != 0 {
-                return Err(invalid(at + 28, "nonzero on-disc runtime offset"));
+            let payload_offset = word(16, "payload offset")? as usize;
+            let size = word(20, "payload size")? as usize;
+            let compressed_size = word(24, "compressed size")? as usize;
+            if word(28, "runtime offset")? != 0 {
+                return Err(invalid(offset(at, 28)?, "nonzero on-disc runtime offset"));
             }
-            if offset != pos {
-                return Err(invalid(at + 16, "payload gap or overlap"));
+            if payload_offset != pos {
+                return Err(invalid(offset(at, 16)?, "payload gap or overlap"));
             }
             let stored_size = if attributes == 2 { compressed_size } else { size };
-            v.slice(offset, stored_size).field("entry payload")?;
+            v.slice(payload_offset, stored_size).field("entry payload")?;
             if (attributes == 2) != (compressed_size != 0) {
                 return Err(invalid(
-                    at + 24,
+                    offset(at, 24)?,
                     "compressed attribute and compressed size disagree",
                 ));
             }
             if attributes == 1 {
                 if size != 0 || alignment != 0 {
-                    return Err(invalid(at + 20, "section marker has payload or alignment"));
+                    return Err(invalid(
+                        offset(at, 20)?,
+                        "section marker has payload or alignment",
+                    ));
                 }
                 if let Some(section) = sections.last_mut() {
                     section.entries.end = i;
@@ -138,11 +148,11 @@ impl Pak {
                 section: sections.len().checked_sub(1),
                 attributes,
                 alignment,
-                offset,
+                offset: payload_offset,
                 size,
                 compressed_size,
             });
-            pos += stored_size;
+            pos = offset(pos, stored_size)?;
         }
         if pos != bytes.len() {
             return Err(invalid(pos, "trailing bytes after PAK payloads"));
@@ -165,6 +175,11 @@ impl Pak {
 
     /// Raw encoded bytes (a marker has an empty payload).
     pub fn encoded(&self, index: usize) -> Result<&[u8]> {
+        self.stored(index).map(|(_, bytes)| bytes)
+    }
+
+    /// The entry and its stored bytes.
+    fn stored(&self, index: usize) -> Result<(&Entry, &[u8])> {
         let e = self
             .entries
             .get(index)
@@ -174,14 +189,17 @@ impl Pak {
         } else {
             e.size
         };
-        Ok(&self.bytes[e.offset..e.offset + stored_size])
+        // `from_bytes` checked this span, so it only fails for a `Pak` built some other way
+        let bytes = View::new(&self.bytes)
+            .slice(e.offset, stored_size)
+            .field("entry payload")?;
+        Ok((e, bytes))
     }
 
     /// Stored entries borrow the archive; compressed entries allocate only when requested.
     /// Compression errors identify the entry's absolute payload offset and the stream-relative error.
     pub fn payload(&self, index: usize) -> Result<Cow<'_, [u8]>> {
-        let bytes = self.encoded(index)?;
-        let e = &self.entries[index];
+        let (e, bytes) = self.stored(index)?;
         if e.attributes == 2 {
             Ok(Cow::Owned(
                 cstr::decode(bytes, e.size)

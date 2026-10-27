@@ -53,10 +53,14 @@
 //! let error = Pak::from_bytes(header.to_vec()).unwrap_err();
 //! assert_eq!(error.to_string(), "at 0x6: unsupported PAK version");
 //! ```
-#![deny(
-    clippy::disallowed_methods,
-    clippy::disallowed_types,
-    clippy::indexing_slicing
+#![deny(clippy::disallowed_methods, clippy::disallowed_types)]
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::indexing_slicing,
+        clippy::arithmetic_side_effects,
+        clippy::cast_possible_truncation
+    )
 )]
 
 pub mod attributes;
@@ -125,25 +129,54 @@ impl Affine {
     /// `self` after `inner` (`world = self (inner local)`), computed in f64 from the stored values with each entry
     /// rounded once to f32.
     pub fn compose(&self, inner: &Affine) -> Affine {
-        let o = self.cols.map(|c| c.map(f64::from));
-        let linear = |v: [f32; 3]| -> [f64; 3] {
-            let v = v.map(f64::from);
-            std::array::from_fn(|r| o[0][r] * v[0] + o[1][r] * v[1] + o[2][r] * v[2])
+        let [[a0, a1, a2], [b0, b1, b2], [c0, c1, c2], [t0, t1, t2]] = self.cols.map(|c| c.map(f64::from));
+        let linear = |[v0, v1, v2]: [f32; 3]| -> [f64; 3] {
+            let (v0, v1, v2) = (f64::from(v0), f64::from(v1), f64::from(v2));
+            [
+                a0 * v0 + b0 * v1 + c0 * v2,
+                a1 * v0 + b1 * v1 + c1 * v2,
+                a2 * v0 + b2 * v1 + c2 * v2,
+            ]
         };
-        let [x, y, z, t] = inner.cols.map(linear);
+        let [x, y, z, [u0, u1, u2]] = inner.cols.map(linear);
         Affine {
             cols: [
-                x.map(|v| v as f32),
-                y.map(|v| v as f32),
-                z.map(|v| v as f32),
-                std::array::from_fn(|r| (t[r] + o[3][r]) as f32),
+                x.map(round_f32),
+                y.map(round_f32),
+                z.map(round_f32),
+                [round_f32(u0 + t0), round_f32(u1 + t1), round_f32(u2 + t2)],
             ],
         }
     }
+}
+
+/// The nearest f32 to `value`: the single rounding that [`Affine::compose`] promises.
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "rounds a computed f64 to f32 by design; it is not a stored length or offset"
+)]
+fn round_f32(value: f64) -> f32 {
+    value as f32
 }
 
 impl From<crate::texture::Error> for Error {
     fn from(error: crate::texture::Error) -> Self {
         Self::Texture(Box::new(error))
     }
+}
+
+/// `base + delta`, refused when it overflows: stored offsets and sizes are summed through this, never with `+`.
+pub(crate) fn offset(base: usize, delta: usize) -> Result<usize> {
+    base.checked_add(delta)
+        .ok_or_else(|| invalid(base, "offset overflows"))
+}
+
+/// `base + index * stride + field`: the offset of `field` in record `index` of a table at `base`, refused when any
+/// step overflows.
+pub(crate) fn at(base: usize, index: usize, stride: usize, field: usize) -> Result<usize> {
+    index
+        .checked_mul(stride)
+        .and_then(|n| n.checked_add(base))
+        .and_then(|n| n.checked_add(field))
+        .ok_or_else(|| invalid(base, "record offset overflows"))
 }

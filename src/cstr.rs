@@ -1,7 +1,7 @@
 //! CSTR v1, the framing of one compressed [`crate::pak`] entry: a header (magic, endian tag, version, block count,
 //! total size) and blocks with 16-bit sizes, each stored as is or as RFC 1951 raw DEFLATE. The header, every block
 //! size and the total are checked, and nothing may follow the last block.
-use crate::{Result, invalid};
+use crate::{Result, invalid, offset};
 use primase_foundations::bytes::{Endian::Big, Field, View};
 use primase_foundations::compress::{Decompressor, Deflate};
 
@@ -38,24 +38,25 @@ pub fn decode(bytes: &[u8], expected: usize) -> Result<Decoded> {
     }
     let mut out = Vec::new();
     let mut pos = 16;
-    let mut stored = 0;
+    let mut stored = 0usize;
     for _ in 0..count {
         let csize = usize::from(v.u16(pos, Big).field("block compressed size")?);
-        let usize = usize::from(v.u16(pos + 2, Big).field("block output size")?);
-        if out.len().checked_add(usize).is_none_or(|n| n > expected) {
-            return Err(invalid(pos + 2, "block exceeds stream output size"));
+        let size_at = offset(pos, 2)?;
+        let size = usize::from(v.u16(size_at, Big).field("block output size")?);
+        if out.len().checked_add(size).is_none_or(|n| n > expected) {
+            return Err(invalid(size_at, "block exceeds stream output size"));
         }
-        pos += 4;
+        pos = offset(pos, 4)?;
         let payload = v.slice(pos, csize).field("block payload")?;
-        out.try_reserve(usize).map_err(|e| invalid(pos, e))?;
-        if csize == usize {
-            stored += 1;
+        out.try_reserve(size).map_err(|e| invalid(pos, e))?;
+        if csize == size {
+            stored = stored.saturating_add(1);
             out.extend_from_slice(payload);
         } else {
-            let decoded = Deflate.decompress(payload, usize).map_err(|e| invalid(pos, e))?;
+            let decoded = Deflate.decompress(payload, size).map_err(|e| invalid(pos, e))?;
             out.extend_from_slice(&decoded);
         }
-        pos += csize;
+        pos = offset(pos, csize)?;
     }
     if pos != bytes.len() {
         return Err(invalid(pos, "trailing bytes after CSTR blocks"));

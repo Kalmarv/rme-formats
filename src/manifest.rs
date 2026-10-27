@@ -119,7 +119,15 @@ fn cell<'a>(row: &'a crate::database::Row, t: &crate::database::Table, col: &str
     let i = t
         .column(col)
         .ok_or_else(|| invalid(0, format!("database: table {:?} has no column {col}", t.name)))?;
-    Ok(&row.values[i])
+    row.values.get(i).ok_or_else(|| {
+        invalid(
+            0,
+            format!(
+                "database: row {} of table {:?} has no value for column {col}",
+                row.rowid, t.name
+            ),
+        )
+    })
 }
 
 fn db_error(e: crate::database::Error) -> crate::Error {
@@ -176,9 +184,9 @@ pub fn parse_layer_name(file: &str) -> Option<(Difficulty, u8, u8)> {
         return None;
     }
     Some((
-        Difficulty::from_nibble((v >> 28) as u8)?,
-        ((v >> 24) & 0xf) as u8,
-        v as u8,
+        Difficulty::from_nibble(u8::try_from(v >> 28).ok()?)?,
+        u8::try_from((v >> 24) & 0xf).ok()?,
+        u8::try_from(v & 0xff).ok()?,
     ))
 }
 
@@ -211,7 +219,7 @@ impl Manifest {
                 .map(str::to_ascii_lowercase);
             let own = level.as_ref().map(|l| format!("levels\\{l}\\{l}").into_bytes());
             match (level, own) {
-                (Some(level), Some(own)) if quartets.len() == 1 && quartets[0] == own => {
+                (Some(level), Some(own)) if quartets.len() == 1 && quartets.first() == Some(&own) => {
                     m.bases.push(BasePak {
                         file: file.into(),
                         level,

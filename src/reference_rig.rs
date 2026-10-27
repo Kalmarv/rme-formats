@@ -42,16 +42,20 @@ pub struct Report {
 impl Report {
     /// Count one more bundle.
     pub fn add(&mut self, bundle: &Bundle) {
-        self.bundles += 1;
-        self.bundles_without_rigs += usize::from(bundle.rigs.is_empty());
-        self.records += bundle.records;
-        self.padding_bytes += bundle.padding_bytes;
+        self.bundles = self.bundles.saturating_add(1);
+        self.bundles_without_rigs = self
+            .bundles_without_rigs
+            .saturating_add(usize::from(bundle.rigs.is_empty()));
+        self.records = self.records.saturating_add(bundle.records);
+        self.padding_bytes = self.padding_bytes.saturating_add(bundle.padding_bytes);
         self.uninterpreted_assets
             .extend(bundle.uninterpreted.iter().cloned());
         for rig in &bundle.rigs {
-            self.rigs += 1;
-            self.joints += rig.rig.joints.len();
-            self.rigs_with_source_payload += usize::from(!rig.source_payload.is_empty());
+            self.rigs = self.rigs.saturating_add(1);
+            self.joints = self.joints.saturating_add(rig.rig.joints.len());
+            self.rigs_with_source_payload = self
+                .rigs_with_source_payload
+                .saturating_add(usize::from(!rig.source_payload.is_empty()));
         }
     }
 }
@@ -205,9 +209,9 @@ pub fn read_bundle(pak: &str, entry: &[u8], bytes: &[u8]) -> Result<Bundle> {
     let records = morpheme_formats::bundle_be32(bytes).map_err(|e| invalid(e.offset, e.detail))?;
     let mut rigs = Vec::new();
     let mut unsupported = Vec::new();
-    let mut padding_bytes = 0;
+    let mut padding_bytes = 0usize;
     for record in &records {
-        padding_bytes += record.padding.len();
+        padding_bytes = padding_bytes.saturating_add(record.padding.len());
         if record.asset_type == 1 {
             let origin = record
                 .offset

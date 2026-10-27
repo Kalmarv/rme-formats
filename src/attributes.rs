@@ -1,8 +1,8 @@
 //! The packed vertex attributes of a rigid mesh: RSX CMP normals, half-float and byte inputs, selected by the model's
 //! vertex format mask. The layout follows the table at 0x1445920 in the game's executable (the variant selected by mask
 //! bit 0x80000). No tangent sign is inferred.
-use crate::Result;
 use crate::scene::Bytes;
+use crate::{Result, at, offset};
 use std::collections::BTreeMap;
 
 /// Decoded source lanes, padded with zero to four components. Values retain their source encoding's meaning.
@@ -29,16 +29,14 @@ pub struct Attributes {
 
 /// RSX sign extends 11:11:10 lanes after shifting to i16 and divides by 32767.
 pub fn cmp(word: u32) -> [f32; 3] {
-    let signed = |shift: u32, bits: u32| {
-        let lane = ((word >> shift) & ((1 << bits) - 1)) as i32;
-        let lane = if lane & (1 << (bits - 1)) != 0 {
-            lane - (1 << bits)
-        } else {
-            lane
-        };
-        (lane * (1 << (16 - bits))) as f32 / 32767.
-    };
-    [signed(0, 11), signed(11, 11), signed(22, 10)]
+    // Each lane is moved to the top of the word and shifted back arithmetically: that sign-extends it and leaves it
+    // scaled to i16 (the 11-bit lanes by 2^5, the 10-bit lane by 2^6).
+    let lane = |top_aligned: u32| (top_aligned as i32 >> 16) as f32 / 32767.;
+    [
+        lane(word << 21),
+        lane((word >> 11) << 21),
+        lane((word >> 22) << 22),
+    ]
 }
 
 /// Byte size from the native declaration entries; unsupported flags/entries refuse this model.
@@ -62,21 +60,22 @@ pub(crate) fn decode(
     gpu_stride: usize,
 ) -> Result<Attributes> {
     let mut a = Attributes::default();
-    for row in cpu.data.as_chunks::<16>().0 {
-        let n = cmp(u32::from_be_bytes(row[12..16].try_into().expect("vertex word")));
+    for (i, row) in cpu.data.as_chunks::<16>().0.iter().enumerate() {
+        let [.., w0, w1, w2, w3] = *row;
+        let n = cmp(u32::from_be_bytes([w0, w1, w2, w3]));
         let len = n.iter().map(|x| x * x).sum::<f32>().sqrt();
         cpu.require(
-            a.normals.len() * 16 + 12,
+            at(0, i, 16, 12)?,
             len == 0. || (len - 1.).abs() <= 0.005,
             "nonunit CMP normal (0.005 tolerance)",
         )?;
-        a.zero_normals += usize::from(len == 0.);
+        a.zero_normals = a.zero_normals.saturating_add(usize::from(len == 0.));
         a.normals.push(n);
     }
-    let mut offset = 0;
-    for bit in (1..=10).filter(|&b| b != 2 && mask & (1 << b) != 0) {
+    let mut column = 0usize;
+    for bit in (1u32..=10).filter(|&b| b != 2 && mask & (1 << b) != 0) {
         let mut values = Vec::with_capacity(count);
-        let lanes = if bit == 1 || bit >= 9 {
+        let lanes: u8 = if bit == 1 || bit >= 9 {
             4
         } else if bit >= 5 {
             2
@@ -84,19 +83,24 @@ pub(crate) fn decode(
             3
         };
         for i in 0..count {
-            let p = i * gpu_stride + offset;
+            let p = at(column, i, gpu_stride, 0)?;
             let mut v = [0.; 4];
             if bit == 1 {
                 for (dst, &src) in v.iter_mut().zip(gpu.slice(p, 4)?) {
                     *dst = f32::from(src) / 255.;
                 }
             } else if bit <= 4 {
-                v[..3].copy_from_slice(&cmp(gpu.u(p)? as u32));
+                let [x, y, z] = cmp(gpu.w(p)?);
+                v = [x, y, z, 0.];
             } else {
-                for (k, dst) in v.iter_mut().take(lanes).enumerate() {
-                    let bytes = gpu.slice(p + k * 2, 2)?;
-                    *dst = half::f16::from_bits(u16::from_be_bytes([bytes[0], bytes[1]])).to_f32();
-                    gpu.require(p + k * 2, dst.is_finite(), "nonfinite half vertex input")?;
+                for (k, dst) in v.iter_mut().take(usize::from(lanes)).enumerate() {
+                    let lane_at = at(p, k, 2, 0)?;
+                    let bytes = gpu.slice(lane_at, 2)?;
+                    let &[hi, lo] = bytes else {
+                        return Err(gpu.error(lane_at, "half-float lane is not two bytes"));
+                    };
+                    *dst = half::f16::from_bits(u16::from_be_bytes([hi, lo])).to_f32();
+                    gpu.require(lane_at, dst.is_finite(), "nonfinite half vertex input")?;
                 }
             }
             values.push(v);
@@ -104,26 +108,26 @@ pub(crate) fn decode(
         if bit == 1 {
             a.colors = Some(values);
         } else {
-            let name = match bit {
-                3 => "attr15".into(),
-                4 => "attr14".into(),
-                5..=8 => format!("stored_uv{}", bit - 5),
-                9 => "attr12".into(),
-                10 => "attr13".into(),
-                _ => unreachable!(),
+            let uv_set = match bit {
+                5 => Some(0),
+                6 => Some(1),
+                7 => Some(2),
+                8 => Some(3),
+                _ => None,
             };
-            if (5..=8).contains(&bit) {
-                a.uvs[bit - 5] = Some(values.iter().map(|v| [v[0], v[1]]).collect());
+            let name = match (bit, uv_set) {
+                (_, Some(set)) => format!("stored_uv{set}"),
+                (3, _) => "attr15".to_owned(),
+                (4, _) => "attr14".to_owned(),
+                (9, _) => "attr12".to_owned(),
+                _ => "attr13".to_owned(),
+            };
+            if let Some(slot) = uv_set.and_then(|set| a.uvs.get_mut(set)) {
+                *slot = Some(values.iter().map(|&[u, v, ..]| [u, v]).collect());
             }
-            a.raw.insert(
-                name,
-                VertexInput {
-                    lanes: lanes as u8,
-                    values,
-                },
-            );
+            a.raw.insert(name, VertexInput { lanes, values });
         }
-        offset += if bit >= 9 { 8 } else { 4 };
+        column = offset(column, if bit >= 9 { 8 } else { 4 })?;
     }
     Ok(a)
 }

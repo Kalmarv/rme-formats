@@ -89,7 +89,7 @@ pub(crate) struct Bytes<'a> {
     base: usize,
 }
 impl<'a> Bytes<'a> {
-    fn error(self, at: usize, reason: &str) -> crate::Error {
+    pub(crate) fn error(self, at: usize, reason: &str) -> crate::Error {
         invalid(self.base + at, format!("{}: {reason}", self.file))
     }
     pub(crate) fn slice(self, at: usize, n: usize) -> Result<&'a [u8]> {
@@ -107,11 +107,17 @@ impl<'a> Bytes<'a> {
             ..self
         })
     }
+    pub(crate) fn w(self, at: usize) -> Result<u32> {
+        let &[a, b, c, d] = self.slice(at, 4)? else {
+            return Err(self.error(at, "word is not four bytes"));
+        };
+        Ok(u32::from_be_bytes([a, b, c, d]))
+    }
     pub(crate) fn u(self, at: usize) -> Result<usize> {
-        Ok(u32::from_be_bytes(self.slice(at, 4)?.try_into().expect("four bytes")) as usize)
+        Ok(self.w(at)? as usize)
     }
     pub(crate) fn f(self, at: usize) -> Result<f32> {
-        let n = f32::from_bits(self.u(at)? as u32);
+        let n = f32::from_bits(self.w(at)?);
         if !n.is_finite() {
             return Err(self.error(at, "nonfinite float"));
         }

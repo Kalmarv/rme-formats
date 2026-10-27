@@ -3,7 +3,7 @@
 //! A program that samples one texture at the first texture coordinate and only copies or multiplies the result with
 //! uniforms reads no normal, light, fog or other interpolant: whatever it draws does not depend on lighting. Every
 //! other program is not classified (the answer is "not known", not "lit").
-use crate::{Result, invalid};
+use crate::{Result, invalid, offset};
 use rsx_reader::cgbinary::{self, Stage};
 use rsx_reader::fragment::{self, Opcode, SourceKind};
 use serde::Serialize;
@@ -27,12 +27,13 @@ pub fn classify(payload: &[u8]) -> Result<PixelProgram> {
     let mut at = 0;
     let mut class: Option<PixelProgram> = None;
     while at < payload.len() {
-        let program = cgbinary::parse_prefix(&payload[at..]).map_err(|e| invalid(at + e.offset, e.detail))?;
-        let end = at + program.bytes.len();
-        let padded = end
-            .checked_add(63)
-            .ok_or_else(|| invalid(at, "padding overflow"))?
-            & !63;
+        let rest = payload
+            .get(at..)
+            .ok_or_else(|| invalid(at, "program starts outside the payload"))?;
+        let program =
+            cgbinary::parse_prefix(rest).map_err(|e| invalid(at.saturating_add(e.offset), e.detail))?;
+        let end = offset(at, program.bytes.len())?;
+        let padded = offset(end, 63)? & !63;
         let padding = payload
             .get(end..padded)
             .ok_or_else(|| invalid(end, "truncated 64-byte padding"))?;
@@ -76,7 +77,11 @@ fn classify_program(program: &cgbinary::Program<'_>) -> Result<PixelProgram> {
                     return Ok(PixelProgram::Unclassified);
                 }
                 if i.constant.is_some() {
-                    let slot = u32::try_from(i.offset + 16).map_err(|_| invalid(i.offset, "offset"))?;
+                    let slot = i
+                        .offset
+                        .checked_add(16)
+                        .and_then(|slot| u32::try_from(slot).ok())
+                        .ok_or_else(|| invalid(i.offset, "constant slot outside u32"))?;
                     let name = program
                         .parameters
                         .iter()
