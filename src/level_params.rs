@@ -79,9 +79,9 @@ pub struct ParamsReport {
 
 fn name_of(v: &Value) -> Option<String> {
     match v {
-        Value::Global(n) => String::from_utf8(n.clone()).ok(),
+        Value::Global(n) => std::str::from_utf8(n).ok().map(str::to_owned),
         Value::Field(t, k) => match &**k {
-            Value::Str(k) => Some(format!("{}.{}", name_of(t)?, String::from_utf8(k.clone()).ok()?)),
+            Value::Str(k) => Some(format!("{}.{}", name_of(t)?, std::str::from_utf8(k).ok()?)),
             _ => None,
         },
         _ => None,
@@ -94,8 +94,8 @@ fn literal(v: &Value) -> std::result::Result<ScriptValue, String> {
         Value::Bool(b) => Ok(ScriptValue::Bool(*b)),
         Value::Number(n) if n.is_finite() => Ok(ScriptValue::Number(*n)),
         Value::Number(n) => Err(format!("argument {n} is not finite")),
-        Value::Str(s) => String::from_utf8(s.clone())
-            .map(ScriptValue::Text)
+        Value::Str(s) => std::str::from_utf8(s)
+            .map(|s| ScriptValue::Text(s.to_owned()))
             .map_err(|_| "a string argument that is not UTF-8".into()),
         _ => Err("an argument that is not a literal".into()),
     }
