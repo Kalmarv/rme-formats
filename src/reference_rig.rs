@@ -34,10 +34,9 @@ pub struct Report {
     pub joints: usize,
     pub padding_bytes: usize,
     pub uninterpreted_assets: Vec<UninterpretedAsset>,
-    /// Rigs are kept in their authored rig space with their header transform; no render-skeleton conversion is made.
-    pub source_space_rigs: usize,
-    /// Each rig retains its complete payload, including auxiliary data outside the supported reference fields.
-    pub rigs_with_uninterpreted_fields: usize,
+    /// Rigs that retain their type 1 payload ([`ReferenceRig::source_payload`] is not empty): the auxiliary tables
+    /// and header fields outside the reference joints stay available to the caller.
+    pub rigs_with_source_payload: usize,
 }
 
 impl Report {
@@ -52,8 +51,7 @@ impl Report {
         for rig in &bundle.rigs {
             self.rigs += 1;
             self.joints += rig.rig.joints.len();
-            self.source_space_rigs += 1;
-            self.rigs_with_uninterpreted_fields += 1;
+            self.rigs_with_source_payload += usize::from(!rig.source_payload.is_empty());
         }
     }
 }
@@ -73,38 +71,60 @@ pub struct ReferenceRig {
     pub source_payload: Vec<u8>,
 }
 
+/// Why the reference matrices of a rig cannot be built.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum MatrixError {
+    /// A joint names a parent that is not a joint of the rig.
+    #[error("joint {joint} names parent {parent}, but the rig has {joints} joints")]
+    ParentOutsideRig { joint: usize, parent: u32, joints: usize },
+    /// A joint is its own ancestor.
+    #[error("joint {joint} is its own ancestor: cyclic reference hierarchy")]
+    Cycle { joint: usize },
+    /// A global matrix has a NaN or infinite entry.
+    #[error("joint {joint}: nonfinite global reference matrix")]
+    NonFinite { joint: usize },
+}
+
 impl ReferenceRig {
     /// Global references in authored rig space. The separate rig-header orientation/vector is not applied.
     /// Matches the native reference constructor: XYZW to an affine matrix, then parent global * local.
     /// Local entries use f32 arithmetic; parent composition uses f64 intermediates rounded to f32 once.
     /// This preserves the construction's meaning, without promising bit equality to native FMA rounding.
-    pub fn source_matrices(&self) -> std::result::Result<Vec<Affine>, String> {
-        let mut matrices: Vec<Option<Affine>> = vec![None; self.rig.joints.len()];
-        for start in 0..self.rig.joints.len() {
+    pub fn source_matrices(&self) -> std::result::Result<Vec<Affine>, MatrixError> {
+        let joints = &self.rig.joints;
+        let mut matrices: Vec<Option<Affine>> = vec![None; joints.len()];
+        let mut on_chain = vec![false; joints.len()];
+        for start in 0..joints.len() {
+            // Walk up to the nearest joint that is already resolved (or a root), then resolve the walk downwards.
             let mut chain = Vec::new();
             let mut next = Some(start);
             while let Some(index) = next {
-                if matrices
-                    .get(index)
-                    .ok_or("reference parent outside rig")?
-                    .is_some()
-                {
+                if matrices.get(index).is_some_and(Option::is_some) {
                     break;
                 }
-                if chain.contains(&index) {
-                    return Err("cyclic reference hierarchy".into());
-                }
-                chain.push(index);
-                next = self
-                    .rig
-                    .joints
-                    .get(index)
-                    .ok_or("reference joint missing")?
-                    .parent
-                    .map(|p| p as usize);
+                let visited = on_chain.get_mut(index).map(|seen| std::mem::replace(seen, true));
+                let (Some(false), Some(joint)) = (visited, joints.get(index)) else {
+                    return Err(MatrixError::Cycle { joint: index });
+                };
+                chain.push((index, joint));
+                next = match joint.parent {
+                    None => None,
+                    Some(parent) if (parent as usize) < joints.len() => Some(parent as usize),
+                    Some(parent) => {
+                        return Err(MatrixError::ParentOutsideRig {
+                            joint: index,
+                            parent,
+                            joints: joints.len(),
+                        });
+                    }
+                };
             }
-            for index in chain.into_iter().rev() {
-                let joint = &self.rig.joints[index];
+            // The walk ended at a root or at the resolved parent of its last joint.
+            let mut above = chain
+                .last()
+                .and_then(|(_, joint)| joint.parent)
+                .and_then(|parent| matrices.get(parent as usize).copied().flatten());
+            for (index, joint) in chain.into_iter().rev() {
                 let [x, y, z, w] = joint.rotation;
                 // Do not normalize the authored quaternion: the native constructor uses these values directly.
                 let local = Affine {
@@ -127,25 +147,18 @@ impl ReferenceRig {
                         joint.translation,
                     ],
                 };
-                let global = if let Some(parent) = joint.parent {
-                    matrices
-                        .get(parent as usize)
-                        .and_then(|m| *m)
-                        .ok_or("reference parent not resolved")?
-                        .compose(&local)
-                } else {
-                    local
-                };
+                let global = above.map_or(local, |parent| parent.compose(&local));
                 if global.cols.iter().flatten().any(|v| !v.is_finite()) {
-                    return Err("nonfinite global reference".into());
+                    return Err(MatrixError::NonFinite { joint: index });
                 }
-                matrices[index] = Some(global);
+                if let Some(slot) = matrices.get_mut(index) {
+                    *slot = Some(global);
+                }
+                above = Some(global);
             }
         }
-        matrices
-            .into_iter()
-            .map(|m| m.ok_or_else(|| "unresolved reference joint".into()))
-            .collect()
+        // Every joint was resolved by the walk that started at it.
+        Ok(matrices.into_iter().flatten().collect())
     }
 }
 

@@ -3,7 +3,7 @@
 use morpheme_formats::{Joint, Rig};
 use rme_formats::{
     Affine,
-    reference_rig::{ReferenceRig, Report, read_bundle},
+    reference_rig::{Bundle, MatrixError, ReferenceRig, Report, read_bundle},
 };
 
 fn source() -> ReferenceRig {
@@ -79,7 +79,27 @@ fn hand_worked_noncommuting_parent_and_frame() {
         expected,
     );
     reordered.rig.joints[1].parent = Some(0);
-    assert!(reordered.source_matrices().expect_err("cycle").contains("cyclic"));
+    assert_eq!(
+        reordered.source_matrices().expect_err("cycle"),
+        MatrixError::Cycle { joint: 0 }
+    );
+    assert_eq!(
+        reordered.source_matrices().unwrap_err().to_string(),
+        "joint 0 is its own ancestor: cyclic reference hierarchy"
+    );
+    let mut dangling = source.clone();
+    dangling.rig.joints[1].parent = Some(5);
+    assert_eq!(
+        dangling.source_matrices().unwrap_err(),
+        MatrixError::ParentOutsideRig {
+            joint: 1,
+            parent: 5,
+            joints: 2
+        }
+    );
+    let mut nonfinite = source.clone();
+    nonfinite.rig.joints[1].translation[0] = f32::INFINITY;
+    assert_eq!(nonfinite.source_matrices().unwrap_err(), MatrixError::NonFinite { joint: 1 });
 }
 
 #[test]
@@ -98,4 +118,41 @@ fn unsupported_siblings_reported_and_malformed_bundle_is_atomic() {
     bundle.resize(64, 0);
     let error = read_bundle("fixture", b"anim", &bundle).expect_err("empty rig");
     assert!(error.to_string().contains("0x40"));
+}
+
+#[test]
+fn report_counts_only_what_each_rig_retains() {
+    let mut with_payload = source();
+    with_payload.source_payload = vec![1, 2, 3];
+    let bundle = |rigs| Bundle {
+        records: 2,
+        padding_bytes: 0,
+        rigs,
+        uninterpreted: vec![],
+    };
+    let mut report = Report::default();
+    report.add(&bundle(vec![with_payload, source()]));
+    assert_eq!((report.rigs, report.joints), (2, 4));
+    // the second rig carries no payload: nothing of it is retained beyond its joints
+    assert_eq!(report.rigs_with_source_payload, 1);
+}
+
+#[test]
+fn a_long_reversed_hierarchy_is_linear() {
+    // joint i's parent is i + 1: every start walks the whole chain once
+    let mut long = source();
+    let n = 200_000u32;
+    long.rig.joints = (0..n)
+        .map(|id| Joint {
+            id,
+            name: Vec::new(),
+            parent: (id + 1 < n).then_some(id + 1),
+            rotation: [0., 0., 0., 1.],
+            translation: [0., 0., 0.],
+            position_w_bits: 0,
+        })
+        .collect();
+    let started = std::time::Instant::now();
+    assert_eq!(long.source_matrices().unwrap().len(), n as usize);
+    assert!(started.elapsed().as_secs() < 5, "{:?}", started.elapsed());
 }
