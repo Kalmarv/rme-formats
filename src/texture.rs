@@ -209,8 +209,8 @@ impl<'a> TextureCatalog<'a> {
         Some(&self.archives[record.archive].1.sections()[section].name)
     }
 
-    /// The packaged payload bytes of a copy, exactly as stored, without inventing a pixel layout.
-    pub fn encoded(&self, texture: usize, payload: Payload) -> Result<Cow<'_, [u8]>> {
+    /// The record, the pixel source of `payload` and the archive that holds it.
+    fn locate(&self, texture: usize, payload: Payload) -> Result<(&TextureRecord, PixelSource, &'a Pak)> {
         let record = self.records.get(texture).ok_or(Error::Copy {
             texture,
             detail: "record index out of bounds",
@@ -223,7 +223,16 @@ impl<'a> TextureCatalog<'a> {
             texture,
             detail: "requested pixel payload is absent",
         })?;
-        Ok(self.archives[record.archive].1.payload(pixels.entry)?)
+        let (_, pak) = self.archives.get(record.archive).ok_or(Error::Copy {
+            texture,
+            detail: "record names an archive the catalog does not hold",
+        })?;
+        Ok((record, pixels, pak))
+    }
+
+    /// The packaged payload bytes of a copy, exactly as stored, without inventing a pixel layout.
+    pub fn encoded(&self, texture: usize, payload: Payload) -> Result<Cow<'_, [u8]>> {
+        self.pixel_data(texture, payload).map(|(_, _, bytes)| bytes)
     }
 
     /// All source records of this extensionless material texture path. `/` and
@@ -246,19 +255,7 @@ impl<'a> TextureCatalog<'a> {
         texture: usize,
         payload: Payload,
     ) -> Result<(CellGcmTexture, u8, std::borrow::Cow<'_, [u8]>)> {
-        let r = self.records.get(texture).ok_or(Error::Copy {
-            texture,
-            detail: "record index out of bounds",
-        })?;
-        let pixels = match payload {
-            Payload::Primary => r.pixels,
-            Payload::CubeTail => r.cube_tail,
-        }
-        .ok_or(Error::Copy {
-            texture,
-            detail: "requested pixel payload is absent",
-        })?;
-        let bytes = self.archives[r.archive].1.payload(pixels.entry)?;
-        Ok((r.header.gcm, pixels.first_mip, bytes))
+        let (record, pixels, pak) = self.locate(texture, payload)?;
+        Ok((record.header.gcm, pixels.first_mip, pak.payload(pixels.entry)?))
     }
 }

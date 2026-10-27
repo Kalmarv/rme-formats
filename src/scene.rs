@@ -4,7 +4,7 @@
 //! [`decode_quartet`] from an archive.
 //!
 //! Positions and indices are checked against the stored bounds and counts, the submeshes must partition the index
-//! list, and the parts of the files that are not decoded are listed in [`Scene::unread`]. Offsets in diagnostics are
+//! list, and the spans of the files that are set aside undecoded are listed in [`Scene::unread`]. Offsets in diagnostics are
 //! relative to the named decoded file. A model whose vertex variant is not supported is returned with
 //! [`Model::refusal`] set and no geometry, while the other models decode.
 use crate::attributes::{self, Attributes};
@@ -74,7 +74,11 @@ pub struct Scene {
     pub placements: Vec<Placement>,
     /// The SCP's node table, world matrices and blob sections (spot chunks).
     pub tables: scp_tables::Tables,
+    /// The skeleton of the processed skins, read from the SCP when any model has one.
     pub source_bones: Option<Vec<SourceBone>>,
+    /// Spans the reader sets aside undecoded: metadata gaps of the MLP, unknown SCP tables, and the SCP blob sections
+    /// and chain tail that no decoder reads. The spans of one file are disjoint. The SCP header and the fields of the
+    /// tables that are decoded are not listed.
     pub unread: Vec<Unread>,
 }
 
@@ -465,13 +469,6 @@ pub fn decode(scp: &[u8], mlp: &[u8], mmp: &[u8], mgp: &[u8]) -> Result<Scene> {
             });
         }
     }
-    // Remaining SCP records, pointers and trailing blob are deliberately accounted for as unread.
-    scene.unread.push(Unread {
-        file: "scp",
-        offset: 0,
-        bytes: scp.len(),
-        reason: "opaque header/placement fields, nested tables and blob; overlaps known fields",
-    });
     for i in 0..n {
         let at = off + i * 48;
         let id = s.u(at + 8)? as u32;

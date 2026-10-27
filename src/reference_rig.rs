@@ -76,7 +76,11 @@ pub struct ReferenceRig {
 pub enum MatrixError {
     /// A joint names a parent that is not a joint of the rig.
     #[error("joint {joint} names parent {parent}, but the rig has {joints} joints")]
-    ParentOutsideRig { joint: usize, parent: u32, joints: usize },
+    ParentOutsideRig {
+        joint: usize,
+        parent: u32,
+        joints: usize,
+    },
     /// A joint is its own ancestor.
     #[error("joint {joint} is its own ancestor: cyclic reference hierarchy")]
     Cycle { joint: usize },

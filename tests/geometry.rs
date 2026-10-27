@@ -379,7 +379,11 @@ fn every_packed_layout_family_and_source_lanes() {
 #[test]
 fn mutated_words_never_panic() {
     use std::panic::{AssertUnwindSafe, catch_unwind};
-    let fixtures = [Fixture::new(), Fixture::processed(), Fixture::attributes(0x807fd, 40)];
+    let fixtures = [
+        Fixture::new(),
+        Fixture::processed(),
+        Fixture::attributes(0x807fd, 40),
+    ];
     let mut panics = Vec::new();
     for (n, fixture) in fixtures.iter().enumerate() {
         for file in 0..4 {
@@ -424,5 +428,44 @@ fn mutated_words_never_panic() {
             }
         }
     }
-    assert!(panics.is_empty(), "panics (fixture, file, offset, value): {panics:?}");
+    assert!(
+        panics.is_empty(),
+        "panics (fixture, file, offset, value): {panics:?}"
+    );
+}
+
+/// `Scene::unread` lists disjoint spans: no entry covers a whole file that the others lie inside.
+#[test]
+fn unread_spans_are_disjoint_per_file() {
+    for fixture in [
+        Fixture::new(),
+        Fixture::processed(),
+        Fixture::attributes(0x807fd, 40),
+    ] {
+        let scene = fixture.decode().unwrap();
+        for (i, a) in scene.unread.iter().enumerate() {
+            for b in &scene.unread[i + 1..] {
+                if a.file == b.file {
+                    assert!(
+                        a.offset + a.bytes <= b.offset || b.offset + b.bytes <= a.offset,
+                        "overlapping unread spans {a:?} and {b:?}"
+                    );
+                }
+            }
+            assert!(a.bytes > 0, "{a:?}");
+            let len = if a.file == "scp" {
+                fixture.scp.len()
+            } else {
+                fixture.mlp.len()
+            };
+            assert!(a.offset + a.bytes <= len, "{a:?} past the end of {len}");
+        }
+        assert!(
+            !scene
+                .unread
+                .iter()
+                .any(|u| u.file == "scp" && u.offset == 0 && u.bytes == fixture.scp.len()),
+            "a whole-file span"
+        );
+    }
 }

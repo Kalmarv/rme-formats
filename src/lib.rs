@@ -53,7 +53,11 @@
 //! let error = Pak::from_bytes(header.to_vec()).unwrap_err();
 //! assert_eq!(error.to_string(), "at 0x6: unsupported PAK version");
 //! ```
-#![deny(clippy::disallowed_methods, clippy::disallowed_types)]
+#![deny(
+    clippy::disallowed_methods,
+    clippy::disallowed_types,
+    clippy::indexing_slicing
+)]
 
 pub mod attributes;
 pub mod cstr;
@@ -90,6 +94,9 @@ pub enum Error {
     /// The data is not what the format allows, at `offset` in the file or decoded entry being read.
     #[error("at {offset:#x}: {detail}")]
     Invalid { offset: usize, detail: String },
+    /// A texture header or pixel copy was refused; the inner error keeps its own offset.
+    #[error(transparent)]
+    Texture(Box<crate::texture::Error>),
 }
 
 /// A read that is either done or refused with an [`Error`].
@@ -132,5 +139,11 @@ impl Affine {
                 std::array::from_fn(|r| (t[r] + o[3][r]) as f32),
             ],
         }
+    }
+}
+
+impl From<crate::texture::Error> for Error {
+    fn from(error: crate::texture::Error) -> Self {
+        Self::Texture(Box::new(error))
     }
 }

@@ -213,7 +213,10 @@ fn mutated_words_never_panic() {
         ]
     };
     for at in (0..record.len() - 3).step_by(4) {
-        for value in values(u32::from_be_bytes(record[at..at + 4].try_into().unwrap()), record.len()) {
+        for value in values(
+            u32::from_be_bytes(record[at..at + 4].try_into().unwrap()),
+            record.len(),
+        ) {
             let mut b = record.clone();
             put(&mut b, at, value);
             let names = UniformNames::new();
@@ -229,10 +232,15 @@ fn mutated_words_never_panic() {
         }
     }
     for at in (0..index.len() - 3).step_by(4) {
-        for value in values(u32::from_be_bytes(index[at..at + 4].try_into().unwrap()), index.len()) {
+        for value in values(
+            u32::from_be_bytes(index[at..at + 4].try_into().unwrap()),
+            index.len(),
+        ) {
             let mut i = index.clone();
             put(&mut i, at, value);
-            if std::panic::catch_unwind(|| material::bank("env", &i, &record, |_| Ok(UniformNames::new()))).is_err() {
+            if std::panic::catch_unwind(|| material::bank("env", &i, &record, |_| Ok(UniformNames::new())))
+                .is_err()
+            {
                 panics.push(("index", at, value));
             }
         }

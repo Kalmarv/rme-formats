@@ -99,7 +99,10 @@ fn hand_worked_noncommuting_parent_and_frame() {
     );
     let mut nonfinite = source.clone();
     nonfinite.rig.joints[1].translation[0] = f32::INFINITY;
-    assert_eq!(nonfinite.source_matrices().unwrap_err(), MatrixError::NonFinite { joint: 1 });
+    assert_eq!(
+        nonfinite.source_matrices().unwrap_err(),
+        MatrixError::NonFinite { joint: 1 }
+    );
 }
 
 #[test]

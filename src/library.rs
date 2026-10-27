@@ -59,7 +59,9 @@ impl<'a> MaterialLibrary<'a> {
                 let Some(stem) = e.name.strip_suffix(b".psp") else {
                     continue;
                 };
-                let stem = std::str::from_utf8(stem).map_err(|e| invalid(0, e))?.to_owned();
+                let stem = std::str::from_utf8(stem)
+                    .map_err(|err| invalid(e.offset, format!("fragment program name is not UTF-8: {err}")))?
+                    .to_owned();
                 let payload = pak.payload(i)?;
                 let reflected = material::fragment_uniform_names(&payload)?;
                 let class = pixel_program::classify(&payload)?;
@@ -98,8 +100,8 @@ impl<'a> MaterialLibrary<'a> {
                 let (i, _) = entries
                     .next()
                     .ok_or_else(|| invalid(0, format!("missing {name}")))?;
-                if entries.next().is_some() {
-                    return Err(invalid(0, format!("duplicate {name}")));
+                if let Some((_, duplicate)) = entries.next() {
+                    return Err(invalid(duplicate.offset, format!("duplicate {name}")));
                 }
                 banks.payload(i)
             };
@@ -133,7 +135,7 @@ impl<'a> MaterialLibrary<'a> {
             materials: by_id,
             programs: BTreeSet::new(),
             classes: BTreeMap::new(),
-            textures: TextureCatalog::new(assets).map_err(|e| invalid(0, e))?,
+            textures: TextureCatalog::new(assets)?,
         })
     }
 

@@ -155,7 +155,18 @@ fn mutated_words_never_panic() {
     let mut panics = Vec::new();
     for (name, base) in [("pak", archive()), ("cstr", stream())] {
         for at in (0..base.len() - 3).step_by(2) {
-            for value in [0, 1, 2, 0x7fff, 0x8000, 0xffff, 0x7fff_ffff, 0x8000_0000, u32::MAX, u32::MAX - 1] {
+            for value in [
+                0,
+                1,
+                2,
+                0x7fff,
+                0x8000,
+                0xffff,
+                0x7fff_ffff,
+                0x8000_0000,
+                u32::MAX,
+                u32::MAX - 1,
+            ] {
                 let mut b = base.clone();
                 if at % 4 == 0 {
                     word(&mut b, at, value);
