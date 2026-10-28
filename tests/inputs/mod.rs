@@ -51,6 +51,12 @@ primase_testdata::inputs! {
             about: "per-microcode SHA256 fragment disassembly plus occurrence index: 3267 distinct microcodes covering all 181851 packaged fragment programs; tests/fragment_disc.rs",
             source: "independent: RPCS3's Cg fragment-program decoder (TaskFP) at upstream commit 979a52415003fd7a74ddd216e1a5782b3731281f, built unchanged as a command-line tool and run over every distinct microcode; represented operands and control boundaries compared, omitted modifiers and sampling operands checked with hand-worked fixtures; disagreements are settled with fixtures rather than deferring to this tool",
         },
+        Query::Oracle(OracleSet::Rpcs3, Game::Shred, "vertex") => {
+            status: Live,
+            gate: true,
+            about: "per-microcode SHA256 vertex disassembly (RPCS3's text and the same normalized by its grammar to JSON) for the 170 distinct vertex microcodes covering all 199017 packaged vertex programs; tests/vertex_disc.rs",
+            source: "independent: RPCS3's Cg vertex-program disassembler (TaskVP) at upstream commit 979a52415003fd7a74ddd216e1a5782b3731281f, built unchanged as a command-line tool and run over every distinct microcode; sources, write masks, saturate and condition fields compared, destinations compared as RPCS3 prints them (it prints a second temporary after an output)",
+        },
     }
     debug {}
 }
