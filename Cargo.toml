@@ -48,7 +48,7 @@ morpheme-formats = { version = "0.1.0", git = "https://github.com/Kalmarv/morphe
 primase-foundations = { version = "0.2.1", git = "https://github.com/Kalmarv/primase-foundations", rev = "e895f966130651bd78c47505b53322cc3f58083a" }
 primase-testdata = { version = "0.1.0", git = "https://github.com/Kalmarv/primase-testdata", rev = "d0258530ca9ca0ca74e957716ae8683e7facc8a7" }
 quantydb-sqlite = { version = "=0.4.0", default-features = false }
-rsx-reader = { version = "0.2.0", git = "https://github.com/Kalmarv/dx", rev = "f5b2af5b55ae06537cfce386102ee63c99b5a641" }
+rsx-reader = { version = "0.3.0", git = "https://github.com/Kalmarv/dx", rev = "e42b5ff7559e364c1c8a8977ece6460cd8797205" }
 serde = { version = "1", default-features = false, features = ["std", "derive"] }
 serde_json = { version = "=1.0.154", default-features = false, features = ["std", "preserve_order", "float_roundtrip"] }
 sha2 = { version = "=0.11.1", default-features = false }

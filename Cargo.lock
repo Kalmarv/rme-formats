@@ -537,8 +537,8 @@ dependencies = [
 
 [[package]]
 name = "rsx-reader"
-version = "0.2.0"
-source = "git+https://github.com/Kalmarv/dx?rev=f5b2af5b55ae06537cfce386102ee63c99b5a641#f5b2af5b55ae06537cfce386102ee63c99b5a641"
+version = "0.3.0"
+source = "git+https://github.com/Kalmarv/dx?rev=e42b5ff7559e364c1c8a8977ece6460cd8797205#e42b5ff7559e364c1c8a8977ece6460cd8797205"
 dependencies = [
  "primase-foundations",
  "thiserror",
