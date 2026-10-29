@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 (2026-10-29)
 
 - **Breaking:** depends on `dx` 0.4.0, whose `rsx-reader` type `gcm::CellGcmTexture` is the type of
   `TextureHeader::gcm`; and on primase-foundations 0.3.0, lua51-bytecode 0.2.0 and morpheme-formats 0.1.1.

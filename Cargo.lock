@@ -68,6 +68,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "arrayvec"
+version = "0.7.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3fb67a6e08acf24fdeccbac2cb6ac4305825bd1f117462e0e6f2f193345ad56"
+
+[[package]]
+name = "blake3"
+version = "1.8.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d9e454fc11f76977dc803893aff6304ed33d6a26efae8696573bea74baa27ae"
+dependencies = [
+ "arrayvec",
+ "cc",
+ "cfg-if",
+ "constant_time_eq",
+ "cpufeatures",
+]
+
+[[package]]
 name = "block-buffer"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -89,6 +108,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
+name = "cc"
+version = "1.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "86e055fa6e3e40ad6187ba25b6855eeb635d5271f8e0f0e1e9a5826b8d75bea0"
+dependencies = [
+ "find-msvc-tools",
+ "shlex",
+]
+
+[[package]]
 name = "cfg-if"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -99,6 +128,12 @@ name = "colorchoice"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d07550c9036bf2ae0c684c4297d503f838287c83c53686d05370d0e139ae570"
+
+[[package]]
+name = "constant_time_eq"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b"
 
 [[package]]
 name = "cpufeatures"
@@ -170,6 +205,12 @@ name = "equivalent"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "00d174d5400e5e8fd687ad1049e2f578285fa914201b1af7e8b112a4546bd826"
+
+[[package]]
+name = "find-msvc-tools"
+version = "0.1.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c66915cc5391097de7a2b0b972e8505aa33c0df401fd3a6811dbdb32881ba48"
 
 [[package]]
 name = "flate2"
@@ -353,8 +394,8 @@ checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
 
 [[package]]
 name = "lua51-bytecode"
-version = "0.1.1"
-source = "git+https://github.com/Kalmarv/lua51-bytecode?rev=ac973a0ed6719561e3663b2632acc8b21c6c9a66#ac973a0ed6719561e3663b2632acc8b21c6c9a66"
+version = "0.2.0"
+source = "git+https://github.com/Kalmarv/lua51-bytecode?rev=cfa3a7001c3f8d240a2360b7598609d420d99243#cfa3a7001c3f8d240a2360b7598609d420d99243"
 dependencies = [
  "primase-foundations",
  "thiserror",
@@ -393,8 +434,8 @@ dependencies = [
 
 [[package]]
 name = "morpheme-formats"
-version = "0.1.0"
-source = "git+https://github.com/Kalmarv/morpheme-formats?rev=e70416a8d7dfbb8b532f3959867e332ac4695e3b#e70416a8d7dfbb8b532f3959867e332ac4695e3b"
+version = "0.1.1"
+source = "git+https://github.com/Kalmarv/morpheme-formats?rev=40467a65f41d052534d90c18d980ef3329967de7#40467a65f41d052534d90c18d980ef3329967de7"
 dependencies = [
  "primase-foundations",
  "thiserror",
@@ -443,8 +484,8 @@ checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 
 [[package]]
 name = "primase-foundations"
-version = "0.2.1"
-source = "git+https://github.com/Kalmarv/primase-foundations?rev=e895f966130651bd78c47505b53322cc3f58083a#e895f966130651bd78c47505b53322cc3f58083a"
+version = "0.3.0"
+source = "git+https://github.com/Kalmarv/primase-foundations?rev=f9cf4ece1de77fce9d703c63347dd70b728b7c0e#f9cf4ece1de77fce9d703c63347dd70b728b7c0e"
 dependencies = [
  "flate2",
  "half",
@@ -453,13 +494,15 @@ dependencies = [
  "oozextract",
  "ruzstd",
  "thiserror",
+ "zlib-rs",
 ]
 
 [[package]]
 name = "primase-testdata"
-version = "0.1.0"
-source = "git+https://github.com/Kalmarv/primase-testdata?rev=d0258530ca9ca0ca74e957716ae8683e7facc8a7#d0258530ca9ca0ca74e957716ae8683e7facc8a7"
+version = "0.1.1"
+source = "git+https://github.com/Kalmarv/primase-testdata?rev=b719ce1f1e64c0af0d624a5445cc4871a2cf9977#b719ce1f1e64c0af0d624a5445cc4871a2cf9977"
 dependencies = [
+ "blake3",
  "serde_json",
  "thiserror",
  "toml",
@@ -520,7 +563,7 @@ checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
 name = "rme-formats"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "half",
  "lua51-bytecode",
@@ -537,8 +580,8 @@ dependencies = [
 
 [[package]]
 name = "rsx-reader"
-version = "0.3.0"
-source = "git+https://github.com/Kalmarv/dx?rev=e42b5ff7559e364c1c8a8977ece6460cd8797205#e42b5ff7559e364c1c8a8977ece6460cd8797205"
+version = "0.4.0"
+source = "git+https://github.com/Kalmarv/dx?rev=c32a3689c6bd26a0ee0777664091f4e04843927e#c32a3689c6bd26a0ee0777664091f4e04843927e"
 dependencies = [
  "primase-foundations",
  "thiserror",
@@ -635,6 +678,12 @@ checksum = "f40ca3c46823713e0d4209592e8d6e826aa57e928f09752619fc696c499637f6"
 dependencies = [
  "lazy_static",
 ]
+
+[[package]]
+name = "shlex"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 
 [[package]]
 name = "simd-adler32"
@@ -908,6 +957,12 @@ dependencies = [
  "quote",
  "syn 2.0.119",
 ]
+
+[[package]]
+name = "zlib-rs"
+version = "0.6.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b268e58e7c693d7c271f93ffc4ba3b380412554231c85bf61ca7af91042a4112"
 
 [[package]]
 name = "zmij"
