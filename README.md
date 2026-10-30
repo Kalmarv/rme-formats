@@ -92,6 +92,11 @@ program made with RPCS3's Cg decoder; without them the tests that compare agains
 
 See [CONTRIBUTING.md](CONTRIBUTING.md), which also says how to report a file the library cannot read.
 
+## Check the examples
+
+From the repository root, `cargo test -p rme-formats --doc` checks the crate documentation, and
+`cargo build -p rme-formats --examples` builds its example programs. Examples that read paths need the caller's files; the repository ships no game assets.
+
 ## License
 
 GPL-3.0-or-later; see [LICENSE](LICENSE).
