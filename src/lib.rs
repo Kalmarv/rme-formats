@@ -17,6 +17,7 @@
 //! - Materials: [`material`] reads the MBP/MDP material banks, [`pixel_program`] classifies a compiled fragment program
 //!   with [`rsx_reader`], [`texture`] indexes the packaged texture headers and pixel payloads, and [`library`] joins
 //!   banks, programs and textures.
+//! - The disc: [`disc`] lists where its levels, layers, database and shared archives are.
 //! - Tables: [`database`] reads `MAIN.DB` (SQLite 3) whole through `quantydb-sqlite`; [`session`], [`surfaces`],
 //!   [`manifest`] and [`names`] read the level, session, surface, drop-spot and rail rows of it.
 //! - Scripts: [`level_params`] lists the constant-argument calls of a level's Lua 5.1 parameter script.
@@ -68,6 +69,7 @@
 pub mod attributes;
 pub mod cstr;
 pub mod database;
+pub mod disc;
 pub mod level_params;
 pub mod library;
 pub mod manifest;

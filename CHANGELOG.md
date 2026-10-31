@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- `disc`: the disc's layout (`PS3_GAME/USRDIR`, `MAIN.DB`, `MATERIALS.PAK`, the shared `RME.PAK` and `VFX.PAK`) and its
+  listings: the base levels, read from the `levels` table and the archives present, and the layer archives.
+- `manifest::levels`: the `levels` table's rows alone.
+- tests/disc_levels.rs: the disc's ten base levels and 209 layer archives.
+
 ## 0.3.0 (2026-10-29)
 
 - **Breaking:** depends on `dx` 0.4.0, whose `rsx-reader` type `gcm::CellGcmTexture` is the type of

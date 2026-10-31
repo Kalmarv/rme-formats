@@ -8,6 +8,7 @@ nothing rendered, nothing written back.
 
 | module | reads |
 |---|---|
+| `disc` | where the disc's base levels (the `levels` rows whose `LEVELS/<LEVEL>.PAK` is on the disc), layer archives, database, material banks and shared archives are |
 | `pak`, `cstr` | PAK v4 archives (big endian; names kept as bytes; stored entries or CSTR v1 blocks of raw DEFLATE) |
 | `scene` | a level mesh quartet (`.scp`, `.mlp`, `.mmp`, `.mgp`): models, positions, indices, submeshes, placements |
 | `attributes`, `skin` | packed vertex attributes (RSX CMP normals, halves, colours, UVs) and processed skin records |

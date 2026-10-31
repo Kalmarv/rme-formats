@@ -162,7 +162,7 @@ fn db_error(e: crate::database::Error) -> crate::Error {
 /// `levels`, `session_types` from the game's database.
 type DbRows = (Vec<LevelRow>, Vec<(u32, String)>);
 
-fn db_tables(db: &Database<'_>) -> Result<DbRows> {
+fn level_rows(db: &Database<'_>) -> Result<Vec<LevelRow>> {
     let levels = db.table("levels").map_err(db_error)?;
     let mut rows = Vec::new();
     for r in &levels.rows {
@@ -186,6 +186,11 @@ fn db_tables(db: &Database<'_>) -> Result<DbRows> {
             script: get("SCRIPT")?,
         });
     }
+    Ok(rows)
+}
+
+fn db_tables(db: &Database<'_>) -> Result<DbRows> {
+    let rows = level_rows(db)?;
     let types = db.table("session_types").map_err(db_error)?;
     let mut session_types = Vec::new();
     for r in &types.rows {
@@ -196,6 +201,11 @@ fn db_tables(db: &Database<'_>) -> Result<DbRows> {
         session_types.push((id, name));
     }
     Ok((rows, session_types))
+}
+
+/// The rows of the database's `levels` table, in table order (as [`Manifest::levels`] holds them, without the archives).
+pub fn levels(db: &Database<'_>) -> Result<Vec<LevelRow>> {
+    level_rows(db)
 }
 
 /// A layer archive's difficulty, session type and map id from its file name (`8100000C.PAK`).
