@@ -42,11 +42,11 @@ publish = true
 
 [workspace.dependencies]
 half = { version = "=2.7.1", default-features = false }
-lua51-bytecode = { version = "0.2.0", git = "https://github.com/Kalmarv/lua51-bytecode", rev = "cfa3a7001c3f8d240a2360b7598609d420d99243" }
-morpheme-formats = { version = "0.1.1", git = "https://github.com/Kalmarv/morpheme-formats", rev = "40467a65f41d052534d90c18d980ef3329967de7" }
+lua51-bytecode = { version = "0.2.0", git = "https://github.com/Kalmarv/lua51-bytecode", rev = "1ba5d089f5a1ba4061e3edb77b80ac93d1802300" }
+morpheme-formats = { version = "0.1.1", git = "https://github.com/Kalmarv/morpheme-formats", rev = "187d8827c679eca818707036e8678657ad029628" }
 primase-foundations = "0.3.1"
 primase-testdata = { version = "0.1.6", git = "https://github.com/Kalmarv/primase-testdata", rev = "40acdd6a2775412cc812f67e5b3edfdc9b76c54c" }
-rsx-reader = { version = "0.4.0", git = "https://github.com/Kalmarv/dx", rev = "c32a3689c6bd26a0ee0777664091f4e04843927e" }
+rsx-reader = { version = "0.4.0", git = "https://github.com/Kalmarv/dx", rev = "39883bd084ad1db1f66416f41b25cf2529f9eec1" }
 serde = { version = "1", default-features = false, features = ["std", "derive"] }
 serde_json = { version = "=1.0.154", default-features = false, features = ["std", "preserve_order", "float_roundtrip"] }
 sha2 = { version = "=0.11.1", default-features = false }

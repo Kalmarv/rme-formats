@@ -395,9 +395,9 @@ checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
 [[package]]
 name = "lua51-bytecode"
 version = "0.2.0"
-source = "git+https://github.com/Kalmarv/lua51-bytecode?rev=cfa3a7001c3f8d240a2360b7598609d420d99243#cfa3a7001c3f8d240a2360b7598609d420d99243"
+source = "git+https://github.com/Kalmarv/lua51-bytecode?rev=1ba5d089f5a1ba4061e3edb77b80ac93d1802300#1ba5d089f5a1ba4061e3edb77b80ac93d1802300"
 dependencies = [
- "primase-foundations 0.3.0",
+ "primase-foundations",
  "thiserror",
 ]
 
@@ -435,9 +435,9 @@ dependencies = [
 [[package]]
 name = "morpheme-formats"
 version = "0.1.1"
-source = "git+https://github.com/Kalmarv/morpheme-formats?rev=40467a65f41d052534d90c18d980ef3329967de7#40467a65f41d052534d90c18d980ef3329967de7"
+source = "git+https://github.com/Kalmarv/morpheme-formats?rev=187d8827c679eca818707036e8678657ad029628#187d8827c679eca818707036e8678657ad029628"
 dependencies = [
- "primase-foundations 0.3.0",
+ "primase-foundations",
  "thiserror",
 ]
 
@@ -481,15 +481,6 @@ name = "pin-project-lite"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
-
-[[package]]
-name = "primase-foundations"
-version = "0.3.0"
-source = "git+https://github.com/Kalmarv/primase-foundations?rev=f9cf4ece1de77fce9d703c63347dd70b728b7c0e#f9cf4ece1de77fce9d703c63347dd70b728b7c0e"
-dependencies = [
- "half",
- "thiserror",
-]
 
 [[package]]
 name = "primase-foundations"
@@ -579,7 +570,7 @@ dependencies = [
  "half",
  "lua51-bytecode",
  "morpheme-formats",
- "primase-foundations 0.3.1",
+ "primase-foundations",
  "primase-testdata",
  "rsx-reader",
  "serde",
@@ -591,9 +582,9 @@ dependencies = [
 [[package]]
 name = "rsx-reader"
 version = "0.4.0"
-source = "git+https://github.com/Kalmarv/dx?rev=c32a3689c6bd26a0ee0777664091f4e04843927e#c32a3689c6bd26a0ee0777664091f4e04843927e"
+source = "git+https://github.com/Kalmarv/dx?rev=39883bd084ad1db1f66416f41b25cf2529f9eec1#39883bd084ad1db1f66416f41b25cf2529f9eec1"
 dependencies = [
- "primase-foundations 0.3.0",
+ "primase-foundations",
  "thiserror",
 ]
 
