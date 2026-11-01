@@ -2,7 +2,8 @@
 mod inputs;
 
 use inputs::{Game, install};
-use rme_formats::{database::Database, disc::Disc, manifest};
+use primase_foundations::sqlite::Database;
+use rme_formats::{disc::Disc, manifest};
 
 /// The table names thirteen level folders; ten have a base archive on the disc, the folder listing of which is the
 /// reference.

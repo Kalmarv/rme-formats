@@ -6,6 +6,9 @@
   listings: the base levels, read from the `levels` table and the archives present, and the layer archives.
 - `manifest::levels`: the `levels` table's rows alone.
 - tests/disc_levels.rs: the disc's ten base levels and 209 layer archives.
+- **Breaking:** the `database` module moved to primase-foundations 0.3.1 as `sqlite` (feature `sqlite`), unchanged;
+  this crate reads `MAIN.DB` through it and no longer depends on `quantydb-sqlite`. Its synthetic tests and their
+  fixture moved with it; the tests that read SHRED's own `MAIN.DB` stay here.
 
 ## 0.3.0 (2026-10-29)
 

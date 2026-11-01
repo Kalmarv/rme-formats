@@ -1,6 +1,6 @@
 //! MAIN.DB's `surfaces` table: the names collision surfaces are numbered by.
-use crate::database::{Database, Value};
 use crate::{Result, invalid};
+use primase_foundations::sqlite::{Database, Value};
 
 /// The `surfaces` table: the name of each id (`surfaces.id`, 0..n in order), so an id is an index into the list.
 #[derive(Clone, Debug, PartialEq, Eq)]

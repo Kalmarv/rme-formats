@@ -4,8 +4,8 @@
 //! the guide splines, which the navigation sets name `NavGuide_<set><n>` (`<set>` one or two capital letters, the
 //! sets `NAV_SET_START` in `<Level>_dropspots` names; `<n>` from 0). Splines whose ids hash none of these stay
 //! unnamed; the report counts them.
-use crate::database::{Database, Value};
 use crate::{Result, invalid};
+use primase_foundations::sqlite::{Database, Value};
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
 
@@ -38,7 +38,7 @@ pub fn guide_name(id: u32) -> Option<&'static str> {
 pub fn flythrough_rails(db: &Database<'_>, level: &str) -> Result<Option<Vec<String>>> {
     let t = match db.table(&format!("{level}_sessions")) {
         Ok(t) => t,
-        Err(crate::database::Error::NoTable(_)) => return Ok(None),
+        Err(primase_foundations::sqlite::Error::NoTable(_)) => return Ok(None),
         Err(e) => return Err(invalid(0, format!("database: {e}"))),
     };
     let Some(col) = t.column("FLYTHROUGH_RAIL") else {

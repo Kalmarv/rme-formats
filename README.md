@@ -14,7 +14,7 @@ nothing rendered, nothing written back.
 | `attributes`, `skin` | packed vertex attributes (RSX CMP normals, halves, colours, UVs) and processed skin records |
 | `scp_tables`, `scp_splines`, `scp_cameras`, `scp_lights`, `scp_locators`, `scp_occluders` | an SCP's nodes, world matrices and blob sections: spot chunks, splines, cameras, lights, locators, occluders |
 | `material`, `pixel_program`, `texture`, `library` | MBP/MDP material banks, fragment programs (uniform names and a microcode classification), 84-byte texture headers with their packaged pixel copies, and the three joined |
-| `database`, `session`, `surfaces`, `manifest`, `names` | `MAIN.DB` (SQLite 3) tables, the level/session/goal/task rows, collision surface names, which archives hold a level, spline names |
+| `session`, `surfaces`, `manifest`, `names` | `MAIN.DB` (SQLite 3, read whole by `primase_foundations::sqlite`): the level/session/goal/task rows, collision surface names, which archives hold a level, spline names |
 | `level_params` | the constant-argument calls of a level's Lua 5.1 parameter script |
 | `reference_rig` | the Morpheme reference rigs of an animation container |
 

@@ -49,7 +49,7 @@ impl Disc {
         &self.usrdir
     }
 
-    /// The game's database, `DATABASE/MAIN.DB` ([`crate::database`]).
+    /// The game's database, `DATABASE/MAIN.DB` (read with `primase_foundations::sqlite`).
     pub fn database(&self) -> PathBuf {
         self.usrdir.join("database/main.db")
     }

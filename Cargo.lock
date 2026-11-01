@@ -397,7 +397,7 @@ name = "lua51-bytecode"
 version = "0.2.0"
 source = "git+https://github.com/Kalmarv/lua51-bytecode?rev=cfa3a7001c3f8d240a2360b7598609d420d99243#cfa3a7001c3f8d240a2360b7598609d420d99243"
 dependencies = [
- "primase-foundations",
+ "primase-foundations 0.3.0",
  "thiserror",
 ]
 
@@ -437,7 +437,7 @@ name = "morpheme-formats"
 version = "0.1.1"
 source = "git+https://github.com/Kalmarv/morpheme-formats?rev=40467a65f41d052534d90c18d980ef3329967de7#40467a65f41d052534d90c18d980ef3329967de7"
 dependencies = [
- "primase-foundations",
+ "primase-foundations 0.3.0",
  "thiserror",
 ]
 
@@ -487,11 +487,22 @@ name = "primase-foundations"
 version = "0.3.0"
 source = "git+https://github.com/Kalmarv/primase-foundations?rev=f9cf4ece1de77fce9d703c63347dd70b728b7c0e#f9cf4ece1de77fce9d703c63347dd70b728b7c0e"
 dependencies = [
+ "half",
+ "thiserror",
+]
+
+[[package]]
+name = "primase-foundations"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c8ce10679d3b7293ed544edd2db56485a7b458574d3c95084d97d27e9d7e9200"
+dependencies = [
  "flate2",
  "half",
  "libloading",
  "lz4_flex",
  "oozextract",
+ "quantydb-sqlite",
  "ruzstd",
  "thiserror",
  "zlib-rs",
@@ -568,9 +579,8 @@ dependencies = [
  "half",
  "lua51-bytecode",
  "morpheme-formats",
- "primase-foundations",
+ "primase-foundations 0.3.1",
  "primase-testdata",
- "quantydb-sqlite",
  "rsx-reader",
  "serde",
  "serde_json",
@@ -583,7 +593,7 @@ name = "rsx-reader"
 version = "0.4.0"
 source = "git+https://github.com/Kalmarv/dx?rev=c32a3689c6bd26a0ee0777664091f4e04843927e#c32a3689c6bd26a0ee0777664091f4e04843927e"
 dependencies = [
- "primase-foundations",
+ "primase-foundations 0.3.0",
  "thiserror",
 ]
 

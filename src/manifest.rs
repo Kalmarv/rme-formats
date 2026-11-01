@@ -10,9 +10,9 @@
 //! difficulty a program wants, are the caller's. The row-to-map-id join is the level's Lua load script (`LoadData`
 //! constants in the encrypted `SCRIPTS.SDAT`), which this reader does not read; [`Manifest::map_ids`] gives the
 //! candidates (a level's maps) from the archives themselves.
-use crate::database::{Database, Value};
 use crate::{Result, invalid};
 use crate::{pak::Pak, scene};
+use primase_foundations::sqlite::{Database, Value};
 
 /// A layer archive's difficulty nibble.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -140,7 +140,11 @@ fn number(v: &Value) -> Option<u32> {
     }
 }
 
-fn cell<'a>(row: &'a crate::database::Row, t: &crate::database::Table, col: &str) -> Result<&'a Value> {
+fn cell<'a>(
+    row: &'a primase_foundations::sqlite::Row,
+    t: &primase_foundations::sqlite::Table,
+    col: &str,
+) -> Result<&'a Value> {
     let i = t
         .column(col)
         .ok_or_else(|| invalid(0, format!("database: table {:?} has no column {col}", t.name)))?;
@@ -155,7 +159,7 @@ fn cell<'a>(row: &'a crate::database::Row, t: &crate::database::Table, col: &str
     })
 }
 
-fn db_error(e: crate::database::Error) -> crate::Error {
+fn db_error(e: primase_foundations::sqlite::Error) -> crate::Error {
     invalid(0, format!("database: {e}"))
 }
 
@@ -328,7 +332,7 @@ impl Manifest {
 pub fn drop_spots(db: &Database<'_>, level: &str) -> Result<Option<Vec<DropSpot>>> {
     let t = match db.table(&format!("{level}_dropspots")) {
         Ok(t) => t,
-        Err(crate::database::Error::NoTable(_)) => return Ok(None),
+        Err(primase_foundations::sqlite::Error::NoTable(_)) => return Ok(None),
         Err(e) => return Err(db_error(e)),
     };
     let mut out = Vec::new();

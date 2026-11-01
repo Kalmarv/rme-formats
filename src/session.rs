@@ -1,6 +1,6 @@
 //! MAIN.DB's level/session/goal/task rows. This reader records relationships without activating them.
-use crate::database::{Database, Table, Value};
 use crate::{Result, invalid};
+use primase_foundations::sqlite::{Database, Table, Value};
 use serde::Serialize;
 use std::collections::BTreeMap;
 
