@@ -30,7 +30,7 @@ A Rust library that reads the game files of Tony Hawk: Shred (PlayStation 3, 201
 
 ### Installation
 
-The last release, 0.4.0, is on crates.io:
+The last release, 0.5.0, is on crates.io:
 
 ```sh
 cargo add rme-formats

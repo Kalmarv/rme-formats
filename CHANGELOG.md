@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.0 (2026-11-06)
+
+- **Breaking:** depends on `dx` 0.5.0, whose `rsx-reader` type `gcm::CellGcmTexture` is the type of
+  `TextureHeader::gcm` (the same source as 0.4.0's).
+
 ## 0.4.0 (2026-11-06)
 
 - `disc`: the disc's layout (`PS3_GAME/USRDIR`, `MAIN.DB`, `MATERIALS.PAK`, the shared `RME.PAK` and `VFX.PAK`) and its

@@ -566,7 +566,7 @@ checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
 name = "rme-formats"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "half",
  "lua51-bytecode",
@@ -582,8 +582,9 @@ dependencies = [
 
 [[package]]
 name = "rsx-reader"
-version = "0.4.0"
-source = "git+https://github.com/Kalmarv/dx?rev=39883bd084ad1db1f66416f41b25cf2529f9eec1#39883bd084ad1db1f66416f41b25cf2529f9eec1"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e74fb249333d2ea259f3b0c8bdf15779b19a40d7ab7093b0b4f06019c315fe6"
 dependencies = [
  "primase-foundations",
  "thiserror",
