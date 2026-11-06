@@ -1,5 +1,7 @@
 # rme-formats
 
+[![crates.io: rme-formats](https://img.shields.io/crates/v/rme-formats?label=rme-formats)](https://crates.io/crates/rme-formats) [![docs.rs](https://img.shields.io/docsrs/rme-formats)](https://docs.rs/rme-formats) [![CI](https://img.shields.io/github/actions/workflow/status/Kalmarv/rme-formats/ci.yml?branch=main&label=CI)](https://github.com/Kalmarv/rme-formats/actions/workflows/ci.yml)
+
 A Rust library that reads the game files of Tony Hawk: Shred (PlayStation 3, 2010), which runs on Robomodo's RME engine. It is used by [primase](https://github.com/Kalmarv/primase), which converts the game's assets.
 
 ## Features

@@ -9,11 +9,43 @@ jobs:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
           toolchain: "1.99.0"
           components: rustfmt, clippy
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked
+  release:
+    # a commit that moves a version releases it once every check passed (CONTRIBUTING.md, Releasing)
+    needs: [check]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency: release
+    permissions:
+      contents: write
+      id-token: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: "1.99.0"
+      - id: plan
+        run: python3 .github/release.py plan
+      - if: steps.plan.outputs.crates
+        run: python3 .github/release.py verify
+        env:
+          PLAN: ${{ steps.plan.outputs.plan }}
+      - if: steps.plan.outputs.crates
+        id: auth
+        uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1.0.6
+      - if: steps.plan.outputs.plan != '[]'
+        run: python3 .github/release.py publish
+        env:
+          PLAN: ${{ steps.plan.outputs.plan }}
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
