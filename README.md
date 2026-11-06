@@ -30,17 +30,10 @@ A Rust library that reads the game files of Tony Hawk: Shred (PlayStation 3, 201
 
 ### Installation
 
-The last release, 0.3.0, is on crates.io:
+The last release, 0.4.0, is on crates.io:
 
 ```sh
 cargo add rme-formats
-```
-
-The `main` branch has changes that are not released yet: the `disc` module, and `MAIN.DB` is read through `primase_foundations::sqlite` instead of the old `database` module. To use them, depend on the repository:
-
-```toml
-[dependencies]
-rme-formats = { git = "https://github.com/Kalmarv/rme-formats" }
 ```
 
 ### Usage

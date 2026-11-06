@@ -3,7 +3,8 @@
 
 A release unit is the packages that share the workspace version (`version.workspace = true`), or one package with a
 version of its own. A unit is released when its version moves: one of its publishable crates has a version crates.io
-does not have yet, or it ships binaries (RELEASE_BINS) and that version has no GitHub Release yet. Releasing a unit
+does not have yet, or it ships binaries (RELEASE_BINS), has no GitHub Release of that version yet, and the version
+differs from the parent commit's or is newer than the unit's latest tag. Releasing a unit
 tags the commit (`v<version>` for the workspace unit or a repository's only unit, `<package>-v<version>` otherwise),
 publishes its crates to crates.io in dependency order and creates the GitHub Release: notes from the version's
 CHANGELOG section (else the commits since the unit's previous tag), the binaries and their SHA256SUMS attached.
@@ -14,8 +15,9 @@ Every step skips what is already done, so a rerun of a failed release finishes i
   release.py build TARGET    build the planned binaries for TARGET into dist/
   release.py publish [--dry-run]   tag, publish and create the Releases (with --dry-run: say what it would do)
 
-Run it from the cargo workspace's folder. Environment: RELEASE_BINS (the binary targets shipped as downloads), PLAN (the plan job's output; computed again when
-unset), GH_TOKEN (gh), CARGO_REGISTRY_TOKEN (cargo publish).
+Run it from the cargo workspace's folder. Environment: RELEASE_BINS (the binary targets shipped as downloads),
+RELEASE_DIST (the archives; dist/), PLAN (the plan job's output; computed again when unset), GH_TOKEN (gh),
+CARGO_REGISTRY_TOKEN (cargo publish).
 """
 
 import hashlib
@@ -35,7 +37,7 @@ import urllib.request
 import zipfile
 
 ROOT = pathlib.Path.cwd()  # the cargo workspace
-DIST = ROOT / "dist"
+DIST = pathlib.Path(os.environ.get("RELEASE_DIST") or ROOT / "dist")  # the binary archives
 LOCKED = ["--locked"] if (ROOT / "Cargo.lock").exists() else []  # a library repository may not commit its lock file
 
 
@@ -79,11 +81,39 @@ def release_tags():
     return {r["tagName"] for r in json.loads(out)}
 
 
+def parse_version(v):
+    return tuple(int(x) for x in re.match(r"(\d+)\.(\d+)\.(\d+)", v).groups())
+
+
+def version_moved(u, pkgs):
+    """Whether a unit's version moved: it differs from the parent commit's, or is newer than the unit's latest tag. A
+    run started by hand (a private repository's release) is the request itself: its version moved if unreleased."""
+    if os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch":
+        return True
+    prefix = u["tag"][: -len(u["version"])]
+    tagged = [t[len(prefix):] for t in run("git", "tag", "--list", f"{prefix}*").stdout.split()]
+    tagged = [v for v in tagged if re.fullmatch(r"\d+\.\d+\.\d+.*", v)]
+    if tagged and parse_version(u["version"]) > max(map(parse_version, tagged)):
+        return True
+    top = pathlib.Path(run("git", "rev-parse", "--show-toplevel").stdout.strip())
+    manifest = pathlib.Path(pkgs[u["package"]]["manifest_path"]) if u["package"] else ROOT / "Cargo.toml"
+    old = run("git", "show", f"HEAD^:{manifest.resolve().relative_to(top.resolve()).as_posix()}", check=False)
+    if old.returncode:
+        if re.search(r"does not exist|exists on disk, but not in|invalid object name", old.stderr):
+            return True  # a new package (or the first commit)
+        sys.exit(f"git show HEAD^:{manifest}: {old.stderr}")
+    t = tomllib.loads(old.stdout)
+    v = t.get("package", {}).get("version") if u["package"] else t.get("workspace", {}).get("package", {}).get("version")
+    return v != u["version"]
+
+
 def compute_plan():
     meta = json.loads(run("cargo", "metadata", "--no-deps", "--format-version", "1").stdout)
     members = set(meta["workspace_members"])
     pkgs = {p["name"]: p for p in meta["packages"] if p["id"] in members}
-    wanted = set(os.environ.get("RELEASE_BINS", "").split())
+    # RELEASE_BINS: `bin` (every target) or `bin:windows` / `bin:linux` (only targets whose triple names it)
+    only = dict((w.split(":") + [""])[:2] for w in os.environ.get("RELEASE_BINS", "").split())
+    wanted = set(only)
     head = run("git", "rev-parse", "HEAD").stdout.strip()
 
     units = {}
@@ -96,7 +126,7 @@ def compute_plan():
         u = units.setdefault(key, {"package": key, "version": p["version"], "crates": [], "bins": []})
         if publishable:
             u["crates"].append(p["name"])
-        u["bins"] += [{"package": p["name"], "bin": b} for b in bins]
+        u["bins"] += [{"package": p["name"], "bin": b, "only": only[b]} for b in bins]
     missing = wanted - {b["bin"] for u in units.values() for b in u["bins"]}
     if missing:
         sys.exit(f"RELEASE_BINS names binaries no workspace package has: {' '.join(sorted(missing))}")
@@ -126,7 +156,7 @@ def compute_plan():
                      "a crate's first release: the token holder publishes it first (CONTRIBUTING.md, Releasing)")
         if never:
             print(f"::warning::{' '.join(never)} not on crates.io yet: its first publish needs the token holder")
-        if pending or (u["bins"] and not released) or (tagged == head and not released):
+        if pending or (u["bins"] and not released and version_moved(u, pkgs)) or (tagged == head and not released):
             u["publish"] = pending
             u["crates"] = [c for c in u["crates"] if c not in never]
             plan.append(u)
@@ -184,6 +214,8 @@ def build_cmd(target):
     exe = ".exe" if "windows" in target else ""
     for u in load_plan():
         for b in u["bins"]:
+            if b.get("only") and b["only"] not in target:
+                continue
             run("cargo", "build", "--release", *LOCKED, "--target", target, "-p", b["package"], "--bin", b["bin"],
                 capture=False)
             built = ROOT / "target" / target / "release" / f"{b['bin']}{exe}"
@@ -228,7 +260,7 @@ def notes(u):
     prefix = u["tag"][: -len(u["version"])]
     tags = run("git", "tag", "--list", f"{prefix}*", "--merged", "HEAD", "--sort=-v:refname").stdout.split()
     prev = next((t for t in tags if t != u["tag"]), None)
-    where = ["--", str(dirs[0].relative_to(ROOT))] if u["package"] else []
+    where = ["--", os.path.relpath(dirs[0], ROOT)] if u["package"] else []
     commits = run("git", "log", "--format=- %s (%h)", f"{prev}..HEAD" if prev else "HEAD", *where).stdout.splitlines()
     more = f"\n\n…and {len(commits) - 100} earlier commits" if len(commits) > 100 else ""
     return "\n".join(commits[:100]) + more

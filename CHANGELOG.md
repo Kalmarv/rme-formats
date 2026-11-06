@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 (2026-11-06)
 
 - `disc`: the disc's layout (`PS3_GAME/USRDIR`, `MAIN.DB`, `MATERIALS.PAK`, the shared `RME.PAK` and `VFX.PAK`) and its
   listings: the base levels, read from the `levels` table and the archives present, and the layer archives.
