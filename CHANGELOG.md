@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.0 (2026-11-07)
+
+- **Breaking:** depends on `rsx-reader` 0.11.0 (before, 0.5.0), whose `gcm::CellGcmTexture` is the type of
+  `TextureHeader::gcm`. Its fields are the same; code that names the type needs `rsx-reader` 0.11.
+
 ## 0.5.0 (2026-11-06)
 
 - **Breaking:** depends on `dx` 0.5.0, whose `rsx-reader` type `gcm::CellGcmTexture` is the type of
