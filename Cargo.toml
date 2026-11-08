@@ -42,8 +42,8 @@ publish = true
 
 [workspace.dependencies]
 half = { version = "=2.7.1", default-features = false }
-lua51-bytecode = { version = "0.2.0", git = "https://github.com/Kalmarv/lua51-bytecode", rev = "1ba5d089f5a1ba4061e3edb77b80ac93d1802300" }
-morpheme-formats = { version = "0.1.1", git = "https://github.com/Kalmarv/morpheme-formats", rev = "187d8827c679eca818707036e8678657ad029628" }
+lua51-bytecode = { version = "0.2.0" }
+morpheme-formats = { version = "0.1.1" }
 primase-foundations = "0.3.1"
 primase-testdata = "0.1.8"
 rsx-reader = "0.12.0"

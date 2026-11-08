@@ -4,6 +4,8 @@
 
 - **Breaking:** depends on `rsx-reader` 0.12.0 (before, 0.11.0), whose `gcm::CellGcmTexture` is the type of
   `TextureHeader::gcm`. Its fields are the same; code that names the type needs `rsx-reader` 0.12.
+- Depends on `morpheme-formats` 0.1.1 and `lua51-bytecode` 0.2.0 from crates.io, not by git revision, so a program linking this crate by
+  git builds the same copies of them it links from crates.io.
 
 ## 0.6.0 (2026-11-07)
 

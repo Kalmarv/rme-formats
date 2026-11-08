@@ -394,8 +394,9 @@ checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
 
 [[package]]
 name = "lua51-bytecode"
-version = "0.2.0"
-source = "git+https://github.com/Kalmarv/lua51-bytecode?rev=1ba5d089f5a1ba4061e3edb77b80ac93d1802300#1ba5d089f5a1ba4061e3edb77b80ac93d1802300"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cdd05b16847699f20971f0a79172adb872e6e9e74d085227a3f9ae378b918e05"
 dependencies = [
  "primase-foundations",
  "thiserror",
@@ -435,7 +436,8 @@ dependencies = [
 [[package]]
 name = "morpheme-formats"
 version = "0.1.1"
-source = "git+https://github.com/Kalmarv/morpheme-formats?rev=187d8827c679eca818707036e8678657ad029628#187d8827c679eca818707036e8678657ad029628"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0edca71f3d91ae090e9b03e287cf714d43fc43f91242a2ec23d571519e08497"
 dependencies = [
  "primase-foundations",
  "thiserror",
